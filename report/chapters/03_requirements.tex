@@ -1,0 +1,154 @@
+\section{System Requirements and Specifications}
+\label{sec:requirements}
+
+\subsection{Software Requirements Specification (SRS) Overview}
+The Software Requirements Specification (SRS) establishes a formal baseline describing the operational capabilities, environmental constraints, user interactions, and performance characteristics of the Online Auction Management System (BidNexus). In object-oriented systems engineering, rigorous requirement modeling is essential to identify candidate entity types, delineate system boundaries, and define class responsibilities before committing to architectural design.
+
+\subsection{User Personas and Actor Delineation}
+The system defines four principal actors, each associated with specific roles, capabilities, and system expectations:
+\begin{enumerate}
+    \item \textbf{Guest / Visitor (Unauthenticated Actor):} Any user who accesses the application prior to authentication. Guests are permitted to inspect basic application metadata and proceed to either User Registration or Login.
+    \item \textbf{Buyer (Registered Actor):} An authenticated customer whose primary objective is commercial acquisition. Buyers browse active auction listings, execute keyword searches, submit competitive financial bids, inspect personal bidding histories, and monitor won or lost auction outcomes.
+    \item \textbf{Seller (Registered Actor):} An authenticated merchant whose objective is item liquidation. Sellers create structured auction listings specifying product details, categories, starting reserve prices, and durations. Sellers monitor bidding activity and review closing outcomes.
+    \item \textbf{System Administrator (Privileged Actor):} A system operator entrusted with catalog moderation, governance, and audit operations. Administrators view aggregated platform metrics, search and filter all registered users and auctions, inspect detailed audit logs, and cancel compromised or fraudulent active listings.
+\end{enumerate}
+
+\subsection{Functional Requirements}
+The functional capabilities of BidNexus are organized into five primary functional domains:
+
+\paragraph{Domain 1: Identity, Authentication, and Session Management}
+\begin{itemize}
+    \item \textbf{FR-1 (Registration):} The system shall allow visitors to register an account by providing their full name, a valid RFC-5322 compliant email address, a password, and a designated primary role (\texttt{BUYER} or \texttt{SELLER}). Duplicate email registrations must be rejected.
+    \item \textbf{FR-2 (Password Security):} The system shall hash all passwords using PBKDF2WithHmacSHA256 with a unique cryptographic salt and high iteration count prior to persistence. Plaintext passwords must never be stored, logged, or exposed in the UI.
+    \item \textbf{FR-3 (Authentication):} The system shall authenticate users against their registered email and password. Upon successful validation, the system shall establish an active user session and dynamically launch the corresponding role dashboard.
+    \item \textbf{FR-4 (Session Clearance / Logout):} The system shall provide an explicit Logout action that invalidates the current session, disposes of open workspace windows, and returns the user to the initial Login interface.
+\end{itemize}
+
+\paragraph{Domain 2: Auction Management and Catalog Browsing}
+\begin{itemize}
+    \item \textbf{FR-5 (Auction Listing Creation):} The system shall enable Sellers to list items by specifying product name, optional category, optional description, a starting price strictly greater than zero, and an expiration timestamp occurring strictly in the future. Initial listing status must be set to \texttt{ACTIVE}.
+    \item \textbf{FR-6 (Catalog Exploration and Search):} The system shall allow Buyers to view all \texttt{ACTIVE} auctions. Users can perform case-insensitive substring searches across product names and categories.
+    \item \textbf{FR-7 (Auction Details Inspection):} The system shall provide detailed views for any selected listing, showing product information, seller identification, starting price, prevailing highest bid, and remaining bidding duration.
+\end{itemize}
+
+\paragraph{Domain 3: Bidding Operations and Concurrency Protection}
+\begin{itemize}
+    \item \textbf{FR-8 (Competitive Bid Submission):} The system shall allow authenticated Buyers to place bids on active listings. A submitted bid must be strictly greater than the current highest bid (or strictly greater than the starting price if no previous bids exist).
+    \item \textbf{FR-9 (Self-Bidding Restriction):} The system shall reject any bid submission where the buyer's user ID matches the seller ID of the target auction (anti-shill bidding policy).
+    \item \textbf{FR-10 (Transactional Concurrency Control):} The system shall execute bid placement within an ACID transaction utilizing row-level update locking in SQLite, ensuring that simultaneous bids are serialized and preventing lost update race conditions.
+\end{itemize}
+
+\paragraph{Domain 4: Automated Lifecycle and Settlement Mechanics}
+\begin{itemize}
+    \item \textbf{FR-11 (Lazy Expiration Resolution):} The system shall evaluate the timestamp of active auctions upon any catalog query or bid submission. If the current time exceeds the expiration time:
+    \begin{itemize}
+        \item If at least one valid bid exists, the auction status transitions to \texttt{SOLD}, and the highest bidder is designated as the winning buyer.
+        \item If zero bids exist, the auction status transitions to \texttt{UNSOLD}.
+    \end{itemize}
+    \item \textbf{FR-12 (Participant Activity Tracking):} The system shall provide Buyers with a dedicated ``My Bids'' view and an ``Auction Results'' view displaying won, lost, and active participation records. Sellers shall have access to summarized listing activity and itemized bid histories.
+\end{itemize}
+
+\paragraph{Domain 5: Administrative Governance and Moderation}
+\begin{itemize}
+    \item \textbf{FR-13 (Dashboard Overview Metrics):} The Admin Panel shall compute and display live statistical summary cards directly from the database: Total Users, Total Buyers, Total Sellers, Total Admins, Total Auctions, Active Auctions, Sold Auctions, Unsold Auctions, and Cancelled Auctions.
+    \item \textbf{FR-14 (User Management and Multi-Criteria Filtering):} Administrators can view all users in a tabular format, search by ID, Name, or Email, and filter by role (\texttt{BUYER} or \texttt{SELLER}). Selecting a user allows opening a detailed profile modal.
+    \item \textbf{FR-15 (Auction Monitoring and Moderation):} Administrators can monitor all platform auctions across all lifecycle states, search by product name, seller, or ID, filter by status, and view complete bid logs in an Auction Details modal.
+    \item \textbf{FR-16 (Listing Cancellation):} Administrators can cancel an active auction. The system verifies that the listing is currently \texttt{ACTIVE}, prompts for confirmation, updates the status to \texttt{CANCELLED}, and updates dashboard metrics. Non-active auctions cannot be cancelled.
+\end{itemize}
+
+\subsection{Non-Functional Requirements (NFRs)}
+Non-functional requirements specify qualitative attributes of the software, summarized in Table \ref{tab:nfr_summary}.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Non-Functional Requirements Specification}
+\label{tab:nfr_summary}
+\begin{tabularx}{\textwidth}{p{3.2cm}p{4cm}X}
+\toprule
+\textbf{Quality Attribute} & \textbf{Requirement Metric} & \textbf{Architectural Realization} \\
+\midrule
+\textbf{Performance} & Query execution and UI table rendering $< 100$\,ms for catalogs up to $10^4$ records. & Indexed columns (\texttt{product\_name}, \texttt{status}, \texttt{seller\_id}); background \texttt{SwingWorker} threads for non-blocking UI. \\
+\addlinespace
+\textbf{Data Integrity} & 100\% ACID compliance; zero orphaned records or negative prices. & SQLite foreign keys enabled via \texttt{PRAGMA foreign\_keys = ON}; database CHECK constraints; JDBC transaction boundaries. \\
+\addlinespace
+\textbf{Security} & Complete protection of credentials; zero SQL injection vulnerability. & PBKDF2 salted password hashing; 100\% parameterized SQL via \texttt{PreparedStatement}; role verification in service layer. \\
+\addlinespace
+\textbf{Fault Tolerance} & Graceful recovery from database locking or bad input; no silent blanks. & Robust exception propagation; informative user dialogs; transaction rollbacks in \texttt{catch} blocks. \\
+\addlinespace
+\textbf{Usability} & Modern, consistent desktop interface; responsive layout. & Unified \texttt{UiStyle} palette; clear typography; tabular views with scroll panes; confirmation dialogs on destructive actions. \\
+\addlinespace
+\textbf{Maintainability} & Modular decoupling; strict separation of concerns. & Strict layered architecture (GUI $\rightarrow$ Service $\rightarrow$ DAO $\rightarrow$ DB); high test coverage via JUnit 5. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Detailed Use Case Specifications}
+To formalize user-system interactions, Tables \ref{tab:uc_bid} and \ref{tab:uc_cancel} present detailed specifications for two core scenarios: placing a bid and cancelling an auction.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Use Case Specification: UC-05 Place Competitive Bid}
+\label{tab:uc_bid}
+\begin{tabularx}{\textwidth}{p{3.5cm}X}
+\toprule
+\textbf{Field} & \textbf{Specification} \\
+\midrule
+\textbf{Use Case ID} & UC-05 \\
+\textbf{Use Case Name} & Place Competitive Bid \\
+\textbf{Primary Actor} & Buyer (Authenticated) \\
+\textbf{Preconditions} & 1. Buyer is successfully authenticated.\\
+                       & 2. Target auction listing has \texttt{ACTIVE} status and has not expired.\\
+                       & 3. Buyer does not own the target auction listing. \\
+\textbf{Main Success Scenario} & 1. Buyer browses or searches active auctions on the Buyer Dashboard.\\
+                               & 2. Buyer selects an auction item and clicks ``Place Bid''.\\
+                               & 3. Buyer inputs a bid amount in the bid dialog and confirms submission.\\
+                               & 4. System initiates an ACID database transaction and acquires a row lock.\\
+                               & 5. System verifies buyer identity, auction status, and checks that current time $<$ end time.\\
+                               & 6. System validates that the bid amount exceeds the current highest bid (or starting price).\\
+                               & 7. System inserts the new bid into the \texttt{bids} table.\\
+                               & 8. System commits the transaction and updates UI bidding tables.\\
+                               & 9. System displays a success confirmation message to the Buyer.\\
+\textbf{Extensions / Alternative Flows} & \textbf{5a. Auction expired during submission:}\\
+                                        & \quad 5a1. System lazily resolves auction to \texttt{SOLD} or \texttt{UNSOLD}.\\
+                                        & \quad 5a2. System commits status change, rolls back bid, and notifies Buyer.\\
+                                        & \textbf{6a. Bid amount is insufficient:}\\
+                                        & \quad 6a1. System rolls back transaction.\\
+                                        & \quad 6a2. System displays error message stating the required minimum amount.\\
+\textbf{Postconditions} & A valid bid record is persisted in SQLite; the auction's highest bid is updated. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Use Case Specification: UC-12 Cancel Active Auction Listing}
+\label{tab:uc_cancel}
+\begin{tabularx}{\textwidth}{p{3.5cm}X}
+\toprule
+\textbf{Field} & \textbf{Specification} \\
+\midrule
+\textbf{Use Case ID} & UC-12 \\
+\textbf{Use Case Name} & Cancel Active Auction Listing \\
+\textbf{Primary Actor} & System Administrator (Authenticated) \\
+\textbf{Preconditions} & 1. User is authenticated with \texttt{ADMIN} role.\\
+                       & 2. Target auction exists in SQLite database with \texttt{ACTIVE} status. \\
+\textbf{Main Success Scenario} & 1. Administrator navigates to the ``Auction Monitoring'' tab in Admin Panel.\\
+                               & 2. Administrator selects an active auction row from the table.\\
+                               & 3. Administrator clicks the ``Cancel Auction'' button.\\
+                               & 4. System displays a modal confirmation dialog requesting verification.\\
+                               & 5. Administrator confirms the cancellation action.\\
+                               & 6. System invokes \texttt{AdminService.cancelAuction(admin, auctionId)}.\\
+                               & 7. System verifies admin privileges and checks that the auction status is \texttt{ACTIVE}.\\
+                               & 8. System executes an \texttt{UPDATE} statement setting status to \texttt{CANCELLED}.\\
+                               & 9. System refreshes the auction table and updates dashboard statistics cards.\\
+                               & 10. System displays a success confirmation dialog. \\
+\textbf{Extensions / Alternative Flows} & \textbf{7a. Auction status is not ACTIVE (already SOLD, UNSOLD, or CANCELLED):}\\
+                                        & \quad 7a1. System rejects the cancellation request.\\
+                                        & \quad 7a2. System displays an error stating non-active listings cannot be cancelled.\\
+\textbf{Postconditions} & The target auction's status is permanently set to \texttt{CANCELLED} in the database. \\
+\bottomrule
+\end{tabularx}
+\end{table}

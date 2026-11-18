@@ -1,0 +1,178 @@
+\section{System Implementation Details}
+\label{sec:implementation}
+
+\subsection{Implementation Overview}
+The implementation of the Online Auction Management System (BidNexus) translates the object-oriented design and architectural specifications into robust, production-quality Java code. This chapter details the technical implementation across five core modules: Authentication and Cryptography, Auction Lifecycle and Lazy Expiration, Concurrency-Safe Bidding, Administrative Governance, and User Interface Engineering.
+
+\subsection{Module 1: Authentication and Cryptographic Security}
+Authentication is coordinated by \texttt{AuthService} in conjunction with \texttt{PasswordUtil}. To protect user credentials against rainbow table attacks and credential stuffing, passwords undergo cryptographic hashing prior to storage.
+
+Listing \ref{lst:password_util} highlights the cryptographic implementation in \texttt{PasswordUtil.java}.
+
+\begin{lstlisting}[caption={Cryptographic Hash Generation and Verification in \texttt{PasswordUtil.java}}, label={lst:password_util}]
+public final class PasswordUtil {
+    private static final String ALGORITHM = "PBKDF2WithHmacSHA256";
+    private static final int ITERATIONS = 65536;
+    private static final int KEY_LENGTH = 256;
+    private static final int SALT_BYTES = 16;
+
+    public static String hash(char[] password) {
+        byte[] salt = new byte[SALT_BYTES];
+        new SecureRandom().nextBytes(salt);
+        byte[] hash = pbkdf2(password, salt, ITERATIONS, KEY_LENGTH);
+        return Base64.getEncoder().encodeToString(salt) + ":" + 
+               ITERATIONS + ":" + 
+               Base64.getEncoder().encodeToString(hash);
+    }
+
+    public static boolean verify(char[] password, String storedHash) {
+        String[] parts = storedHash.split(":");
+        byte[] salt = Base64.getDecoder().decode(parts[0]);
+        int iterations = Integer.parseInt(parts[1]);
+        byte[] expectedHash = Base64.getDecoder().decode(parts[2]);
+        byte[] actualHash = pbkdf2(password, salt, iterations, expectedHash.length * 8);
+        return MessageDigest.isEqual(expectedHash, actualHash); // Constant-time comparison
+    }
+}
+\end{lstlisting}
+
+\paragraph{Key Security Decisions:}
+\begin{enumerate}
+    \item \textbf{Unique Cryptographic Salt:} A 16-byte cryptographically secure pseudo-random salt is generated per password.
+    \item \textbf{High Iteration Work Factor:} 65,536 iterations increase the computational cost for brute-force attacks.
+    \item \textbf{Constant-Time Verification:} \texttt{MessageDigest.isEqual} prevents timing side-channel attacks by comparing byte arrays in constant time.
+    \item \textbf{No Password State in Models:} Model entities (\texttt{User}, \texttt{Buyer}, \texttt{Seller}) never store or expose password hashes.
+\end{enumerate}
+
+\subsection{Module 2: Auction Lifecycle and Lazy Expiration}
+A recurring challenge in auction platforms is ensuring that auctions terminate precisely when their scheduled expiration timestamp arrives. Traditional implementations often rely on background timer threads (e.g., \texttt{ScheduledExecutorService}). However, in desktop and embedded contexts, timer threads can terminate unexpectedly if the application encounters an unhandled exception.
+
+BidNexus implements a deterministic \textbf{Lazy Expiration Pattern}. Whenever an active catalog is queried or a bid is placed, \texttt{AuctionService.refreshExpiredAuctions()} executes automatically.
+
+Listing \ref{lst:lazy_expiration} illustrates how expired listings are evaluated and resolved.
+
+\begin{lstlisting}[caption={Deterministic Lazy Expiration in \texttt{AuctionService.java}}, label={lst:lazy_expiration}]
+public void refreshExpiredAuctions() throws SQLException {
+    LocalDateTime now = LocalDateTime.now();
+    try (Connection conn = databaseConnection.openConnection()) {
+        conn.setAutoCommit(false);
+        try {
+            List<Auction> expiredList = auctionDAO.findExpiredActiveAuctions(conn, now);
+            for (Auction auction : expiredList) {
+                boolean hasBids = bidDAO.findHighestBid(conn, auction.getId()).isPresent();
+                AuctionStatus newStatus = hasBids ? AuctionStatus.SOLD : AuctionStatus.UNSOLD;
+                auctionDAO.updateStatus(conn, auction.getId(), newStatus);
+            }
+            conn.commit();
+        } catch (SQLException | RuntimeException ex) {
+            conn.rollback();
+            throw ex;
+        }
+    }
+}
+\end{lstlisting}
+
+This approach guarantees that users never observe an expired auction in an \texttt{ACTIVE} state, ensuring accurate winner determination without requiring persistent background daemon processes.
+
+\subsection{Module 3: Concurrency Control and Transactional Bidding}
+Bidding is the most concurrency-sensitive operation in an auction system. If two buyers simultaneously bid on the same item, a race condition can cause the lower bid to overwrite the higher bid.
+
+BidNexus solves this challenge in \texttt{BidService.placeBid()} by coordinating an ACID transaction with an explicit update lock in SQLite, as shown in Listing \ref{lst:bidding_transaction}.
+
+\begin{lstlisting}[caption={ACID Transaction and Row-Level Locking in \texttt{BidService.java}}, label={lst:bidding_transaction}]
+public Bid placeBid(Buyer buyer, int auctionId, double amount) throws SQLException {
+    if (buyer == null || buyer.getId() <= 0) {
+        throw new IllegalArgumentException("Sign in with a Buyer account before bidding");
+    }
+    BigDecimal bidAmount = BigDecimal.valueOf(amount);
+
+    try (Connection connection = databaseConnection.openConnection()) {
+        connection.setAutoCommit(false); // Begin ACID transaction
+        try {
+            // Acquire row-level lock via update statement
+            lockAuctionForUpdate(connection, auctionId);
+
+            User persistedBuyer = userDAO.findById(connection, buyer.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Buyer account invalid"));
+            if (!(persistedBuyer instanceof Buyer)) {
+                throw new IllegalArgumentException("Only registered Buyers can place bids");
+            }
+
+            Auction auction = auctionDAO.findById(connection, auctionId)
+                    .orElseThrow(() -> new IllegalArgumentException("Auction was not found"));
+            if (auction.getStatus() != AuctionStatus.ACTIVE) {
+                throw new IllegalArgumentException("This auction is not accepting bids");
+            }
+            if (auction.getSellerId() == buyer.getId()) {
+                throw new IllegalArgumentException("You cannot bid on your own auction");
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            if (auction.isExpired(now)) {
+                AuctionStatus expiredStatus = bidDAO.findHighestBid(connection, auctionId).isPresent()
+                        ? AuctionStatus.SOLD : AuctionStatus.UNSOLD;
+                auctionDAO.updateStatus(connection, auctionId, expiredStatus);
+                connection.commit();
+                throw new IllegalStateException("Auction expired and is now closed");
+            }
+
+            BigDecimal currentPrice = bidDAO.findHighestBid(connection, auctionId)
+                    .map(Bid::getAmount)
+                    .orElse(auction.getStartingPrice());
+            if (bidAmount.compareTo(currentPrice) <= 0) {
+                throw new IllegalArgumentException("Bid must exceed current price of " + currentPrice);
+            }
+
+            Bid savedBid = bidDAO.saveBid(connection, 
+                new Bid(0, auctionId, buyer.getId(), bidAmount, now));
+            connection.commit(); // Atomic commit
+            return savedBid;
+        } catch (SQLException | RuntimeException exception) {
+            connection.rollback(); // Rollback on any failure
+            throw exception;
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Module 4: Administrative Governance and Panel Implementation}
+The administrative subsystem provides real-time system monitoring, auditing, and moderation:
+\begin{enumerate}
+    \item \textbf{Live Dashboard Statistics:} \texttt{AdminService.getDashboardOverview()} executes optimized SQL aggregation queries to compute live counts for total users, buyers, sellers, admins, total auctions, active auctions, sold auctions, unsold auctions, and cancelled auctions.
+    \item \textbf{Multi-Criteria User and Auction Search:} \texttt{AdminPanel} provides combined keyword search fields and role/status dropdown filters, enabling administrators to locate users or auctions by ID, name, email, or lifecycle status.
+    \item \textbf{Detailed Modal Dialogs:} Selecting any row in the users or auctions table enables a ``View Details'' action that opens an informative modal dialog displaying complete entity attributes and itemized bidding logs.
+    \item \textbf{Policy-Compliant Auction Cancellation:} Administrators can cancel an active auction. As implemented in \texttt{AdminService.cancelAuction()}, the system checks that the user has the \texttt{ADMIN} role and confirms the target listing is currently \texttt{ACTIVE}. If the auction is already \texttt{SOLD}, \texttt{UNSOLD}, or \texttt{CANCELLED}, the system throws an \texttt{IllegalStateException}, preventing modification of finalized commercial records.
+\end{enumerate}
+
+\subsection{Module 5: Swing GUI Layout and Asynchronous UI Execution}
+To prevent database operations from freezing the desktop user interface, \texttt{AdminPanel} and other complex views employ \texttt{SwingWorker} threads.
+
+Listing \ref{lst:swing_worker} demonstrates how \texttt{AdminPanel} executes database queries on a background thread while updating UI components safely on the Event Dispatch Thread (EDT).
+
+\begin{lstlisting}[caption={Asynchronous Database Query Execution via \texttt{SwingWorker}}, label={lst:swing_worker}]
+private void refreshDashboardData() {
+    new SwingWorker<DashboardData, Void>() {
+        @Override
+        protected DashboardData doInBackground() throws Exception {
+            // Runs on background worker thread: execute database aggregations
+            Map<String, Object> stats = adminService.getDashboardOverview();
+            List<User> users = adminService.listUsers(admin);
+            List<Auction> auctions = adminService.listAllAuctions(admin);
+            return new DashboardData(stats, users, auctions);
+        }
+
+        @Override
+        protected void done() {
+            // Runs safely on Event Dispatch Thread (EDT)
+            try {
+                DashboardData data = get();
+                updateStatCards(data.stats());
+                populateUserTable(data.users());
+                populateAuctionTable(data.auctions());
+            } catch (Exception ex) {
+                showError("Database Fetch Error", "Failed to retrieve records: " + ex.getMessage());
+            }
+        }
+    }.execute();
+}
+\end{lstlisting}

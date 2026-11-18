@@ -1,0 +1,137 @@
+\section{Database Design and Relational Persistence}
+\label{sec:database_design}
+
+\subsection{Database Architecture and Storage Engine}
+The persistence tier of the Online Auction Management System (BidNexus) is built upon SQLite 3. SQLite stores all tables, indices, and constraints within a single self-contained disk file located at \texttt{database/oams.db} relative to the application's root directory.
+
+SQLite was selected because it combines zero-configuration deployment with full ACID transactional compliance. To ensure referential integrity, \texttt{DatabaseConnection} explicitly enables foreign key constraints upon opening each JDBC connection:
+\begin{lstlisting}[language=SQL]
+PRAGMA foreign_keys = ON;
+\end{lstlisting}
+The connection verifies that the pragma is active, throwing an \texttt{SQLException} if foreign key enforcement is disabled by the underlying driver.
+
+\subsection{Relational Schema Specification}
+The relational database consists of three primary tables: \texttt{users}, \texttt{auctions}, and \texttt{bids}.
+
+\subsubsection{1. Table: \texttt{users}}
+Stores identity profiles, credentials, and role classifications for all system actors.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Relational Schema: \texttt{users} Table}
+\label{tab:schema_users}
+\begin{tabularx}{\textwidth}{p{3cm}p{2.5cm}X}
+\toprule
+\textbf{Column Name} & \textbf{Data Type} & \textbf{Constraints and Purpose} \\
+\midrule
+\texttt{id} & \texttt{INTEGER} & Primary Key, Auto-increment. Unique user identifier. \\
+\texttt{name} & \texttt{TEXT} & Not Null. Full legal or display name of the user. \\
+\texttt{email} & \texttt{TEXT} & Unique, Not Null. Primary login identifier; normalized. \\
+\texttt{password\_hash} & \texttt{TEXT} & Not Null. Salted PBKDF2WithHmacSHA256 hash string. \\
+\texttt{role} & \texttt{TEXT} & Not Null. \texttt{CHECK(role IN ('BUYER', 'SELLER', 'ADMIN'))}. \\
+\texttt{created\_at} & \texttt{TEXT} & ISO-8601 UTC timestamp of account registration. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{2. Table: \texttt{auctions}}
+Stores auction listings created by Sellers.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Relational Schema: \texttt{auctions} Table}
+\label{tab:schema_auctions}
+\begin{tabularx}{\textwidth}{p{3cm}p{2.5cm}X}
+\toprule
+\textbf{Column Name} & \textbf{Data Type} & \textbf{Constraints and Purpose} \\
+\midrule
+\texttt{id} & \texttt{INTEGER} & Primary Key, Auto-increment. Unique auction listing identifier. \\
+\texttt{seller\_id} & \texttt{INTEGER} & Not Null, Foreign Key referencing \texttt{users(id)}. \\
+\texttt{product\_name} & \texttt{TEXT} & Not Null. Title/name of the item; indexed for search. \\
+\texttt{description} & \texttt{TEXT} & Optional detailed description of item condition. \\
+\texttt{category} & \texttt{TEXT} & Optional category classification (e.g., Electronics, Art). \\
+\texttt{starting\_price}& \texttt{REAL} & Not Null. \texttt{CHECK(starting\_price > 0)}. Minimum starting bid. \\
+\texttt{end\_time} & \texttt{TEXT} & Not Null. ISO-8601 timestamp defining auction expiration. \\
+\texttt{status} & \texttt{TEXT} & Not Null. \texttt{CHECK(status IN ('ACTIVE','SOLD','UNSOLD','CANCELLED'))}. \\
+\texttt{created\_at} & \texttt{TEXT} & ISO-8601 UTC timestamp of listing creation. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{3. Table: \texttt{bids}}
+Stores all competitive financial bids placed by Buyers.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Relational Schema: \texttt{bids} Table}
+\label{tab:schema_bids}
+\begin{tabularx}{\textwidth}{p{3cm}p{2.5cm}X}
+\toprule
+\textbf{Column Name} & \textbf{Data Type} & \textbf{Constraints and Purpose} \\
+\midrule
+\texttt{id} & \texttt{INTEGER} & Primary Key, Auto-increment. Unique bid record identifier. \\
+\texttt{auction\_id} & \texttt{INTEGER} & Not Null, Foreign Key referencing \texttt{auctions(id)}. \\
+\texttt{buyer\_id} & \texttt{INTEGER} & Not Null, Foreign Key referencing \texttt{users(id)}. \\
+\texttt{amount} & \texttt{REAL} & Not Null. \texttt{CHECK(amount > 0)}. Monetary value offered. \\
+\texttt{bid\_time} & \texttt{TEXT} & Not Null. ISO-8601 timestamp when bid was accepted. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Data Definition Language (DDL) Generation}
+Schema generation is automated idempotently via \texttt{DatabaseInitializer.initializeSchema()}. Listing \ref{lst:ddl_schema} presents the executable DDL statements.
+
+\begin{lstlisting}[language=SQL, caption={Relational Schema DDL Script}, label={lst:ddl_schema}]
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('BUYER', 'SELLER', 'ADMIN')),
+    created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS auctions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    seller_id INTEGER NOT NULL,
+    product_name TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    starting_price REAL NOT NULL CHECK(starting_price > 0),
+    end_time TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('ACTIVE', 'SOLD', 'UNSOLD', 'CANCELLED')),
+    created_at TEXT,
+    FOREIGN KEY (seller_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS bids (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    auction_id INTEGER NOT NULL,
+    buyer_id INTEGER NOT NULL,
+    amount REAL NOT NULL CHECK(amount > 0),
+    bid_time TEXT NOT NULL,
+    FOREIGN KEY (auction_id) REFERENCES auctions(id),
+    FOREIGN KEY (buyer_id) REFERENCES users(id)
+);
+\end{lstlisting}
+
+\subsection{Database Indexing Strategy}
+To guarantee that user searches and catalog browsing queries execute in under 100\,ms even as database records scale, the schema includes six targeted indices:
+\begin{enumerate}
+    \item \texttt{idx\_auctions\_seller\_id}: Speeds up queries retrieving listings for a specific seller on the Seller Dashboard.
+    \item \texttt{idx\_auctions\_status\_end\_time}: Optimizes lazy expiration scans by quickly identifying \texttt{ACTIVE} auctions where \texttt{end\_time <= now}.
+    \item \texttt{idx\_auctions\_product\_name}: Accelerates keyword substring and prefix queries executed by buyers in the search bar.
+    \item \texttt{idx\_bids\_auction\_id}: Supports rapid retrieval of all bids placed on a given auction listing.
+    \item \texttt{idx\_bids\_amount}: Accelerates queries locating the prevailing highest bid for an auction.
+    \item \texttt{idx\_bids\_buyer\_id}: Optimizes queries populating the ``My Bids'' view on the Buyer Dashboard.
+\end{enumerate}
+
+\subsection{Audit Trails and Referential Integrity Governance}
+A central design principle in BidNexus is that \textbf{records are never permanently deleted from SQLite}. 
+\begin{itemize}
+    \item \textbf{No Cascading Deletion of Commercial History:} If an Administrator or user were permitted to execute \texttt{DELETE FROM users} or \texttt{DELETE FROM auctions}, historical bidding records would either cascade into deletion (erasing financial audit trails) or fail with foreign key violation errors.
+    \item \textbf{Soft Moderation via \texttt{CANCELLED} State:} When an Administrator moderates an active listing, the system updates its status to \texttt{CANCELLED}. All previously submitted bids, timestamps, and seller associations remain permanently preserved for legal and auditing purposes.
+\end{itemize}

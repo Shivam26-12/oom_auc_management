@@ -1,0 +1,95 @@
+\section{Technology Stack and Engineering Tools}
+\label{sec:technology_stack}
+
+\subsection{Technology Selection Rationale}
+The technical stack for the Online Auction Management System (BidNexus) was carefully chosen to balance educational clarity in Object-Oriented Methodologies with industry-standard development practices. Each framework and library was selected for stability, zero-overhead deployment, and native support for core object-oriented principles.
+
+Table \ref{tab:tech_stack} summarizes the primary technologies, versions, and architectural roles within the project.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Comprehensive Technology Stack Specification}
+\label{tab:tech_stack}
+\begin{tabularx}{\textwidth}{p{3cm}p{2cm}p{3cm}X}
+\toprule
+\textbf{Technology} & \textbf{Version} & \textbf{Category} & \textbf{Architectural Role and Justification} \\
+\midrule
+\textbf{Java Platform (JDK)} & 17+ (LTS) & Core Programming Language & Provides strong static typing, OOP abstractions, pattern matching, switch expressions, and modern date/time APIs (\texttt{java.time}). \\
+\addlinespace
+\textbf{Java Swing / AWT} & JDK Built-in & GUI Toolkit & Provides lightweight, cross-platform desktop UI components; predictable event handling on the Event Dispatch Thread (EDT). \\
+\addlinespace
+\textbf{SQLite} & 3.45+ & Relational Database & Embedded, serverless, zero-configuration relational storage engine providing ACID transactions and foreign key enforcement. \\
+\addlinespace
+\textbf{SQLite JDBC Driver} & 3.45.1.0 & Database Connectivity & Standard JDBC driver enabling connection management, prepared statements, and transactional commit/rollback control. \\
+\addlinespace
+\textbf{Apache Maven} & 3.9+ & Build and Dependency Management & Standardizes the build lifecycle, compiles source code, manages dependencies, and automates test suite execution. \\
+\addlinespace
+\textbf{JUnit 5 (Jupiter)} & 5.10.2 & Automated Testing Framework & Executes automated unit and integration tests; provides \texttt{@TempDir} for isolated file-based database testing. \\
+\addlinespace
+\textbf{PlantUML} & 1.2024+ & Visual UML Modeling & Text-based diagramming engine generating formal UML diagrams from declarative source code. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{In-Depth Component Evaluation}
+
+\subsubsection{1. Java 17 Platform Features}
+BidNexus leverages modern Java language enhancements that promote cleaner object-oriented design and reduce boilerplate code:
+\begin{itemize}
+    \item \textbf{Pattern Matching for \texttt{instanceof}:} Simplifies type interrogation and casting, enabling safe polymorphic branching in \texttt{DashboardFrame} (e.g., \texttt{if (user instanceof Buyer buyer)}).
+    \item \textbf{Switch Expressions with Arrow Syntax:} Provides concise, exhaustiveness-checked pattern matching for role and status evaluation without falling-through risks.
+    \item \textbf{\texttt{java.time} Framework:} Replaces legacy \texttt{java.util.Date} with immutable, thread-safe temporal types (\texttt{LocalDateTime}) for precise auction deadline evaluations.
+    \item \textbf{\texttt{BigDecimal} for Financial Precision:} Eliminates IEEE 754 floating-point rounding errors during currency calculations and bid comparisons.
+\end{itemize}
+
+\subsubsection{2. Java Swing and Multithreaded UI Execution}
+Java Swing was selected for the presentation tier because it ships natively with the JDK, eliminating external native UI dependencies. To maintain a responsive interface:
+\begin{itemize}
+    \item All UI mutations run strictly on the \textbf{Event Dispatch Thread (EDT)} via \texttt{SwingUtilities.invokeLater}.
+    \item Long-running administrative database aggregations and search queries are offloaded to \texttt{SwingWorker} background threads, preventing UI freezing during heavy queries.
+\end{itemize}
+
+\subsubsection{3. Embedded SQLite and JDBC Integration}
+Unlike enterprise RDBMS solutions (e.g., PostgreSQL or MySQL) that require running background server daemons and network socket configuration, SQLite is an \textit{embedded serverless} database. The entire database resides in a single cross-platform file (\texttt{database/oams.db}). This simplifies deployment and testing while still supporting standard SQL syntax, foreign key constraints, and transactional consistency.
+
+Through the \texttt{sqlite-jdbc} driver, BidNexus configures SQLite for production-grade reliability:
+\begin{itemize}[noitemsep]
+    \item Foreign key checks are explicitly activated via \texttt{PRAGMA foreign\_keys = ON}.
+    \item Transactions are controlled explicitly via \texttt{Connection.setAutoCommit(false)}, \texttt{commit()}, and \texttt{rollback()}.
+\end{itemize}
+
+\subsubsection{4. Apache Maven Build Lifecycle}
+Maven manages the project build lifecycle, dependency resolution, and test execution. Listing \ref{lst:pom_excerpt} presents the core configuration from \texttt{pom.xml}.
+
+\begin{lstlisting}[caption={Maven Build Configuration (\texttt{pom.xml})}, label={lst:pom_excerpt}]
+<project xmlns="http://maven.apache.org/POM/4.0.0" ...>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.auction</groupId>
+    <artifactId>online-auction-management-system</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.jupiter.version>5.10.2</junit.jupiter.version>
+    </properties>
+
+    <dependencies>
+        <!-- Embedded SQLite JDBC Driver -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.45.1.0</version>
+        </dependency>
+        <!-- JUnit 5 Testing Framework -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
+\end{lstlisting}
