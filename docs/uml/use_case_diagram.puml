@@ -1,0 +1,43 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Visitor
+actor "Authenticated account" as Account
+actor Buyer
+actor Seller
+actor Administrator as Admin
+
+Buyer --|> Account
+Seller --|> Account
+Admin --|> Account
+
+rectangle "Online Auction Management System" {
+  usecase "Register account" as UC_Register
+  usecase "Log in" as UC_Login
+  usecase "Browse auctions" as UC_Browse
+  usecase "Search auctions" as UC_Search
+  usecase "View auction details" as UC_Details
+  usecase "Place bid" as UC_Bid
+  usecase "View bidding history and results" as UC_History
+  usecase "Create auction" as UC_Create
+  usecase "View own auctions and activity" as UC_Own
+  usecase "View registered users" as UC_Users
+  usecase "View and monitor all auctions" as UC_All
+  usecase "Cancel active listing" as UC_Cancel
+}
+
+Visitor --> UC_Register
+Visitor --> UC_Login
+Account --> UC_Login
+Buyer --> UC_Browse
+Buyer --> UC_Search
+Buyer --> UC_Details
+Buyer --> UC_Bid
+Buyer --> UC_History
+Seller --> UC_Create
+Seller --> UC_Own
+Admin --> UC_Users
+Admin --> UC_All
+Admin --> UC_Cancel
+@enduml

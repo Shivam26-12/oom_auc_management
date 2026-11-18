@@ -1,0 +1,6 @@
+com\auction\dao\DatabaseIntegrationTest.class
+com\auction\UserAuthenticationTest.class
+com\auction\BidServiceIntegrationTest.class
+com\auction\AuctionServiceIntegrationTest.class
+com\auction\ui\RolePanelTest.class
+com\auction\AdminServiceIntegrationTest.class

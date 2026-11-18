@@ -1,0 +1,84 @@
+@startuml
+autonumber
+actor Buyer
+boundary BuyerPanel
+control BidService
+participant DatabaseConnection
+participant UserDAO
+participant AuctionDAO
+participant BidDAO
+database "SQLite Database" as Database
+
+Buyer -> BuyerPanel: enter bid amount
+BuyerPanel -> BidService: placeBid(authenticatedBuyer, auctionId, amount)
+activate BidService
+BidService -> DatabaseConnection: openConnection()
+DatabaseConnection --> BidService: connection
+BidService -> BidService: begin transaction
+BidService -> AuctionDAO: lockAuctionForUpdate(connection, auctionId)
+AuctionDAO -> Database: UPDATE auctions SET status = status
+Database --> AuctionDAO: row locked
+BidService -> UserDAO: findById(connection, buyerId)
+UserDAO -> Database: SELECT user role
+Database --> UserDAO: persisted user
+UserDAO --> BidService: Buyer or missing/wrong role
+
+alt buyer is not a persisted Buyer
+  BidService -> BidService: rollback transaction
+  BidService --> BuyerPanel: failure("Buyer account is not valid")
+else persisted Buyer
+  BidService -> AuctionDAO: findById(connection, auctionId)
+  AuctionDAO -> Database: SELECT auction
+  Database --> AuctionDAO: auction row or none
+  AuctionDAO --> BidService: auction
+  alt auction not found
+    BidService -> BidService: rollback transaction
+    BidService --> BuyerPanel: failure("Auction was not found")
+  else auction exists
+    BidService -> BidService: verify ACTIVE and not seller's own auction
+    alt auction closed or buyer owns auction
+      BidService -> BidService: rollback transaction
+      BidService --> BuyerPanel: failure(reason)
+    else auction ACTIVE and buyer eligible
+      BidService -> BidService: compare end time with current time
+      alt auction expired
+        BidService -> BidDAO: findHighestBid(connection, auctionId)
+        BidDAO -> Database: SELECT highest bid
+        Database --> BidDAO: highest bid or none
+        BidDAO --> BidService: highest bid or none
+        alt bid exists
+          BidService -> AuctionDAO: updateStatus(connection, auctionId, SOLD)
+          AuctionDAO -> Database: UPDATE status to SOLD
+          Database --> AuctionDAO: updated
+        else no bids
+          BidService -> AuctionDAO: updateStatus(connection, auctionId, UNSOLD)
+          AuctionDAO -> Database: UPDATE status to UNSOLD
+          Database --> AuctionDAO: updated
+        end
+        BidService -> BidService: commit expiration status
+        BidService --> BuyerPanel: failure("Auction has expired")
+      else auction unexpired
+        BidService -> BidDAO: findHighestBid(connection, auctionId)
+        BidDAO -> Database: SELECT highest bid
+        Database --> BidDAO: highest bid or none
+        BidDAO --> BidService: highest bid or none
+        BidService -> BidService: compare amount to highest bid or starting price
+        alt amount is not strictly greater
+          BidService -> BidService: rollback transaction
+          BidService --> BuyerPanel: failure("Bid must exceed current price")
+        else amount is valid
+          BidService -> BidDAO: saveBid(connection, bid)
+          BidDAO -> Database: INSERT bid
+          Database --> BidDAO: inserted bid
+          BidDAO --> BidService: saved bid
+          BidService -> BidService: commit bid
+          BidService --> BuyerPanel: success(saved bid)
+        end
+      end
+    end
+  end
+end
+
+BuyerPanel --> Buyer: display success or rejection reason
+deactivate BidService
+@enduml

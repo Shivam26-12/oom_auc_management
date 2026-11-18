@@ -1,0 +1,14 @@
+@startuml
+node "User's Computer" as Computer {
+  node "Java Runtime Environment" as JRE {
+    artifact "OAMS Java Desktop Application (Java Swing)" as App
+    artifact "SQLite JDBC Driver" as Driver
+  }
+
+  database "Local SQLite Database File (oams.db)" as DB
+}
+
+App ..> JRE : executes on
+App ..> Driver : JDBC access
+Driver --> DB : local file I/O
+@enduml

@@ -1,0 +1,46 @@
+@startuml
+start
+:Enter credentials;
+:Authenticate and load role-specific dashboard;
+if (Credentials valid?) then (yes)
+  :Browse or search auctions;
+  :Load auction data and finalize expired ACTIVE auctions;
+  if (Expired ACTIVE auction found?) then (yes)
+    if (At least one valid bid?) then (yes)
+      :Set auction status to SOLD;
+      :Identify winner from highest valid bid;
+    else (no)
+      :Set auction status to UNSOLD;
+    endif
+  else (no)
+    :Continue with current auction statuses;
+  endif
+  :Select an auction;
+  :Enter bid amount;
+  :Validate Buyer, ownership, status, expiration, and bid amount;
+  if (Authenticated Buyer and auction ACTIVE and unexpired?) then (yes)
+    if (Amount exceeds current bid or starting price?) then (yes)
+      :Save bid transactionally;
+      :Update displayed bidding information;
+    else (no)
+      :Reject bid and display amount error;
+    endif
+  else (no)
+    :Reject bid;
+    if (Auction expired during validation?) then (yes)
+      if (At least one valid bid?) then (yes)
+        :Set auction status to SOLD;
+        :Identify winner from highest valid bid;
+      else (no)
+        :Set auction status to UNSOLD;
+      endif
+    else (no)
+      :Display eligibility or status error;
+    endif
+  endif
+  stop
+else (no)
+  :Reject login and display error;
+  stop
+endif
+@enduml

@@ -1,0 +1,11 @@
+@startuml
+[*] --> ACTIVE : auction created successfully
+
+ACTIVE --> SOLD : expiration detected [at least one valid bid] / highest bid identifies winner
+ACTIVE --> UNSOLD : expiration detected [no valid bids]
+ACTIVE --> CANCELLED : administrator removes listing
+
+SOLD --> [*]
+UNSOLD --> [*]
+CANCELLED --> [*]
+@enduml

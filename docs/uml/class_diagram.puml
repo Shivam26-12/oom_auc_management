@@ -1,0 +1,286 @@
+@startuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "com.auction.model" {
+  enum UserRole {
+    BUYER
+    SELLER
+    ADMIN
+  }
+
+  enum AuctionStatus {
+    ACTIVE
+    SOLD
+    UNSOLD
+    CANCELLED
+  }
+
+  abstract class User {
+    - id: int
+    - name: String
+    - email: String
+    - createdAt: LocalDateTime
+    + getId(): int
+    + getName(): String
+    + getEmail(): String
+    + getCreatedAt(): LocalDateTime
+    + getRole(): UserRole {abstract}
+  }
+
+  class Buyer {
+    + getRole(): UserRole
+  }
+
+  class Seller {
+    + getRole(): UserRole
+  }
+
+  class Admin {
+    + getRole(): UserRole
+  }
+
+  class Auction {
+    - id: int
+    - sellerId: int
+    - productName: String
+    - description: String
+    - category: String
+    - startingPrice: BigDecimal
+    - endTime: LocalDateTime
+    - status: AuctionStatus
+    - createdAt: LocalDateTime
+    + getId(): int
+    + getSellerId(): int
+    + getProductName(): String
+    + getDescription(): String
+    + getCategory(): String
+    + getStartingPrice(): BigDecimal
+    + getEndTime(): LocalDateTime
+    + getStatus(): AuctionStatus
+    + getCreatedAt(): LocalDateTime
+    + isExpired(): boolean
+    + isExpired(now: LocalDateTime): boolean
+  }
+
+  class Bid {
+    - id: int
+    - auctionId: int
+    - buyerId: int
+    - amount: BigDecimal
+    - bidTime: LocalDateTime
+    + getId(): int
+    + getAuctionId(): int
+    + getBuyerId(): int
+    + getAmount(): BigDecimal
+    + getBidTime(): LocalDateTime
+  }
+}
+
+package "com.auction.service" {
+  class AuthService {
+    + registerBuyer(name: String, email: String, password: String): Buyer
+    + registerSeller(name: String, email: String, password: String): Seller
+    + login(email: String, password: String): Optional<User>
+  }
+
+  class AuctionService {
+    + createAuction(seller: Seller, auction: Auction): Auction
+    + getActiveAuctions(): List<Auction>
+    + searchAuctions(keyword: String): List<Auction>
+    + getAuctionsBySeller(sellerId: int): List<Auction>
+    + getAuctionDetails(auctionId: int): Optional<Auction>
+    + getCurrentHighestBid(auctionId: int): BigDecimal
+    + refreshExpiredAuctions(): void
+  }
+
+  class BidService {
+    - databaseConnection: DatabaseConnection
+    - auctionDAO: AuctionDAO
+    - bidDAO: BidDAO
+    - userDAO: UserDAO
+    + BidService()
+    + BidService(databaseConnection: DatabaseConnection)
+    + placeBid(buyer: Buyer, auctionId: int, amount: double): Bid
+    + getBuyerHistory(buyer: Buyer): List<Bid>
+    + getBuyerAuctionResults(buyer: Buyer): List<BuyerAuctionResult>
+    + getSellerAuctionSummaries(seller: Seller): List<SellerAuctionSummary>
+    + getBidsForSellerAuction(seller: Seller, auctionId: int): List<SellerBidDetails>
+    + getWinningBid(auctionId: int): Optional<Bid>
+    + getWinningBidDetails(auctionId: int): Optional<WinningBidDetails>
+    + countBidsByAuction(auctionId: int): int
+  }
+
+  class AdminService {
+    + listUsers(admin: Admin): List<User>
+    + listAllAuctions(admin: Admin): List<Auction>
+    + cancelAuction(admin: Admin, auctionId: long): void
+  }
+}
+
+package "com.auction.dao" {
+  class DatabaseInitializer {
+    - databaseConnection: DatabaseConnection
+    + initializeSchema(): void
+  }
+
+  class UserDAO {
+    + save(user: User, passwordHash: String): User
+    + findByEmail(email: String): Optional<User>
+    + findById(id: int): Optional<User>
+    + findById(connection: Connection, id: int): Optional<User>
+    + emailExists(email: String): boolean
+    + findPasswordHashByEmail(email: String): Optional<String>
+    + findAll(): List<User>
+  }
+
+  class AuctionDAO {
+    + save(auction: Auction): Auction
+    + findById(auctionId: int): Optional<Auction>
+    + findById(connection: Connection, auctionId: int): Optional<Auction>
+    + findActiveAuctions(): List<Auction>
+    + findAuctionsBySeller(sellerId: int): List<Auction>
+    + searchAuctions(keyword: String): List<Auction>
+    + updateStatus(auctionId: int, status: AuctionStatus): void
+    + updateStatus(connection: Connection, auctionId: int, status: AuctionStatus): void
+    + findExpiredActiveAuctions(now: LocalDateTime): List<Auction>
+    + findExpiredActiveAuctions(connection: Connection, now: LocalDateTime): List<Auction>
+    + hasValidBids(auctionId: int): boolean
+    + findCurrentHighestBidAmount(auctionId: int): BigDecimal
+  }
+
+  class BidDAO {
+    + saveBid(bid: Bid): Bid
+    + saveBid(connection: Connection, bid: Bid): Bid
+    + findBidsByAuction(auctionId: int): List<Bid>
+    + findBidsByAuction(connection: Connection, auctionId: int): List<Bid>
+    + findBidsByBuyer(buyerId: int): List<Bid>
+    + findBidsByBuyer(connection: Connection, buyerId: int): List<Bid>
+    + findHighestBid(auctionId: int): Optional<Bid>
+    + findHighestBid(connection: Connection, auctionId: int): Optional<Bid>
+    + findHighestBidAmount(auctionId: int): BigDecimal
+    + countBidsByAuction(auctionId: int): int
+    + countBidsByAuction(connection: Connection, auctionId: int): int
+    + findWinningBid(auctionId: int): Optional<Bid>
+  }
+
+  class DatabaseConnection {
+    - databaseFile: Path
+    + openConnection(): Connection
+    + getDatabaseFile(): Path
+  }
+}
+
+package "com.auction.ui" {
+  class LoginFrame {
+    - authService: AuthService
+    - emailField: JTextField
+    - passwordField: JPasswordField
+    - submitLogin(): void
+    - openRegistration(): void
+  }
+  class RegisterFrame {
+    - authService: AuthService
+    - roleSelector: JComboBox<UserRole>
+    - submitRegistration(): void
+  }
+  class DashboardFrame {
+    - user: User
+    - authService: AuthService
+    - auctionService: AuctionService
+    - bidService: BidService
+    + DashboardFrame(user: User, authService: AuthService)
+    + DashboardFrame(user: User, authService: AuthService, auctionService: AuctionService)
+    + DashboardFrame(user: User, authService: AuthService, auctionService: AuctionService, bidService: BidService)
+    + DashboardFrame(user: User, authService: AuthService, auctionService: AuctionService, bidService: BidService)
+    - createRolePanel(): JPanel
+    - createPlaceholderPage(page: String): JPanel
+    - showPage(page: String): void
+    - logout(): void
+  }
+  class BuyerPanel {
+    - auctionService: AuctionService
+    - bidService: BidService
+    - searchField: JTextField
+    - auctionTable: JTable
+    + BuyerPanel(buyer: Buyer)
+    + BuyerPanel(buyer: Buyer, auctionService: AuctionService)
+    - loadAuctions(keyword: String): void
+    - showSelectedDetails(): void
+    - openPlaceBidDialog(): void
+    - showMyBids(): void
+    - showAuctionResults(): void
+  }
+  class SellerPanel {
+    - seller: Seller
+    - auctionService: AuctionService
+    - bidService: BidService
+    - tableModel: DefaultTableModel
+    + SellerPanel(seller: Seller)
+    + SellerPanel(seller: Seller, auctionService: AuctionService)
+    - openCreateAuctionDialog(): void
+    - loadAuctions(): void
+    - showSelectedAuctionBids(): void
+  }
+  class AdminPanel {
+    + AdminPanel(admin: Admin)
+  }
+}
+
+package "com.auction.security" {
+  class PasswordUtil {
+    + hash(password: char[]): String {static}
+    + verify(password: char[], storedHash: String): boolean {static}
+  }
+}
+
+package "com.auction" {
+  class Main
+}
+
+Buyer --|> User
+Seller --|> User
+Admin --|> User
+User ..> UserRole
+Auction ..> AuctionStatus
+Seller "1" -- "0..*" Auction : creates
+Auction "1" -- "0..*" Bid : receives
+Buyer "1" -- "0..*" Bid : places
+
+AuthService ..> UserDAO
+AuthService ..> PasswordUtil
+Main ..> UserDAO
+Main ..> PasswordUtil
+Main ..> DatabaseInitializer
+Main ..> DatabaseConnection
+DatabaseInitializer ..> DatabaseConnection
+AuctionService ..> AuctionDAO
+AuctionService ..> BidDAO
+AuctionService ..> DatabaseConnection
+BidService ..> AuctionDAO
+BidService ..> BidDAO
+BidService ..> DatabaseConnection
+AdminService ..> UserDAO
+AdminService ..> AuctionDAO
+AdminService ..> BidDAO
+AdminService ..> DatabaseConnection
+
+LoginFrame ..> AuthService
+RegisterFrame ..> AuthService
+LoginFrame ..> RegisterFrame
+LoginFrame ..> DashboardFrame
+DashboardFrame ..> User
+DashboardFrame ..> AuthService
+DashboardFrame o-- BuyerPanel
+DashboardFrame o-- SellerPanel
+DashboardFrame o-- AdminPanel
+BuyerPanel ..> AuctionService
+BuyerPanel ..> BidService
+SellerPanel ..> AuctionService
+SellerPanel ..> BidService
+AdminPanel ..> AdminService
+
+UserDAO ..> DatabaseConnection
+AuctionDAO ..> DatabaseConnection
+BidDAO ..> DatabaseConnection
+@enduml
