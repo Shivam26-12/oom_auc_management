@@ -33,4 +33,5 @@ Password arrays passed to `PasswordUtil.hash` and `verify` are cleared in `final
 
 ## Initial Administrator
 
-On startup, `Main` creates an initial Admin only when all three environment variables `OAMS_ADMIN_NAME`, `OAMS_ADMIN_EMAIL`, and `OAMS_ADMIN_PASSWORD` are present and nonblank. Existing email addresses are left untouched. If the variables are absent, database startup continues normally. The initial password is hashed using the same utility before it is saved.
+On startup, `Main` creates an initial Admin only when all three environment variables `OAMS_ADMIN_NAME`, `OAMS_ADMIN_EMAIL`, and `OAMS_ADMIN_PASSWORD` are present and nonblank. Existing email
+ addresses are left untouched. If the variables are absent, database startup continues normally. The initial password is hashed using the same utility before it is saved.

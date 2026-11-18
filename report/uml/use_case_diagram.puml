@@ -1,0 +1,70 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam monochrome false
+skinparam actorStyle awesome
+
+skinparam package {
+  BackgroundColor #F8F9FA
+  BorderColor #4A5568
+  FontColor #2D3748
+}
+
+skinparam usecase {
+  BackgroundColor #EDF2F7
+  BorderColor #4A5568
+  ArrowColor #2B6CB0
+}
+
+actor Visitor as "Guest / Visitor"
+actor "Authenticated User" as User
+actor Buyer as "Buyer"
+actor Seller as "Seller"
+actor "System Administrator" as Admin
+
+Buyer --|> User
+Seller --|> User
+Admin --|> User
+
+rectangle "Online Auction Management System (OAMS / BidNexus)" {
+  usecase "Register New Account" as UC_Register
+  usecase "Log In / Authenticate" as UC_Login
+  usecase "Browse Active Auctions" as UC_Browse
+  usecase "Search Auctions by Keyword" as UC_Search
+  usecase "View Auction Details & Bidding Info" as UC_Details
+  usecase "Place Competitive Bid" as UC_Bid
+  usecase "View Personal Bidding History & Won Items" as UC_History
+  usecase "Create New Auction Listing" as UC_Create
+  usecase "Manage Listed Auctions & View Bid Activity" as UC_Own
+  usecase "View Registered Users List & Profiles" as UC_Users
+  usecase "Search & Filter Users (Role, ID, Email)" as UC_FilterUsers
+  usecase "Monitor All System Auctions" as UC_MonitorAuctions
+  usecase "Search & Filter Auctions (Status, Seller)" as UC_FilterAuctions
+  usecase "Cancel Active Auction Listing" as UC_Cancel
+  usecase "View System Dashboard Metrics & Stats" as UC_Stats
+}
+
+Visitor --> UC_Register
+Visitor --> UC_Login
+
+User --> UC_Login
+
+Buyer --> UC_Browse
+Buyer --> UC_Search
+Buyer --> UC_Details
+Buyer --> UC_Bid
+Buyer --> UC_History
+
+Seller --> UC_Create
+Seller --> UC_Own
+Seller --> UC_Details
+
+Admin --> UC_Users
+Admin --> UC_FilterUsers
+Admin --> UC_MonitorAuctions
+Admin --> UC_FilterAuctions
+Admin --> UC_Cancel
+Admin --> UC_Stats
+
+@enduml

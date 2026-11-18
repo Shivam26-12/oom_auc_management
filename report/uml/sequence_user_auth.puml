@@ -1,0 +1,59 @@
+@startuml
+autonumber
+skinparam shadowing false
+skinparam roundcorner 5
+
+actor User as "User (Buyer / Seller / Admin)"
+boundary LoginFrame
+control AuthService
+participant PasswordUtil
+participant UserDAO
+database "SQLite Database (oams.db)" as DB
+boundary DashboardFrame
+
+User -> LoginFrame: Enter email and password, click "Log In"
+activate LoginFrame
+
+LoginFrame -> AuthService: login(email, password)
+activate AuthService
+
+AuthService -> UserDAO: findPasswordHashByEmail(email)
+activate UserDAO
+UserDAO -> DB: SELECT password_hash FROM users WHERE email = ?
+DB --> UserDAO: password_hash string (or null)
+UserDAO --> AuthService: Optional<String> passwordHash
+deactivate UserDAO
+
+alt User email not found
+    AuthService --> LoginFrame: Optional.empty()
+    LoginFrame --> User: Display "Invalid email or password" error
+else Email exists
+    AuthService -> PasswordUtil: verify(password.toCharArray(), passwordHash)
+    activate PasswordUtil
+    PasswordUtil --> AuthService: boolean (true/false)
+    deactivate PasswordUtil
+
+    alt Password mismatch
+        AuthService --> LoginFrame: Optional.empty()
+        LoginFrame --> User: Display "Invalid email or password" error
+    else Password valid
+        AuthService -> UserDAO: findByEmail(email)
+        activate UserDAO
+        UserDAO -> DB: SELECT id, name, email, role, created_at FROM users WHERE email = ?
+        DB --> UserDAO: User row record
+        UserDAO --> AuthService: Optional<User> (Buyer / Seller / Admin)
+        deactivate UserDAO
+        
+        AuthService --> LoginFrame: Optional.of(user)
+        deactivate AuthService
+
+        LoginFrame -> DashboardFrame: new DashboardFrame(user, authService, auctionService, bidService)
+        activate DashboardFrame
+        DashboardFrame -> DashboardFrame: render RolePanel based on user.getRole()
+        DashboardFrame --> User: Display role-tailored workspace
+        LoginFrame -> LoginFrame: dispose()
+        deactivate LoginFrame
+    end
+end
+
+@enduml

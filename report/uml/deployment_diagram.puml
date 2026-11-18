@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam roundcorner 5
+
+node "Client / Host Workstation" as Host {
+  node "Java Virtual Machine (JVM 17+)" as JVM {
+    artifact "BidNexus Desktop Client (BidNexus.jar)" as AppJar {
+      component "Swing GUI Presentation" as CompGUI
+      component "OAMS Service & Domain Models" as CompService
+      component "DAO & Data Layer" as CompDAO
+    }
+    artifact "SQLite JDBC Driver (sqlite-jdbc-3.45.1.0.jar)" as JDBCDriver
+  }
+
+  node "Local Storage / File System" as Storage {
+    file "SQLite Database File\n(database/oams.db)" as DBFile
+  }
+}
+
+CompGUI ..> CompService : Method Invocations
+CompService ..> CompDAO : Method Invocations
+CompDAO ..> JDBCDriver : JDBC API (java.sql.*)
+JDBCDriver --> DBFile : OS File I/O (B-tree storage, WAL lock)
+
+@enduml

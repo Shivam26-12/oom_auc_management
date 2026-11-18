@@ -1,0 +1,306 @@
+\documentclass[12pt,a4paper]{article}
+
+% --- Essential Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage[hyphens]{url}
+\usepackage[colorlinks=true, linkcolor=blue!80!black, citecolor=green!60!black, urlcolor=blue!70!black]{hyperref}
+
+% --- Code Listing Setup ---
+\usepackage{listings}
+\definecolor{javared}{rgb}{0.6,0,0}
+\definecolor{javagreen}{rgb}{0.25,0.5,0.35}
+\definecolor{javapurple}{rgb}{0.5,0,0.35}
+\definecolor{javadocblue}{rgb}{0.25,0.35,0.75}
+\definecolor{codebg}{rgb}{0.97,0.97,0.98}
+\definecolor{framegray}{rgb}{0.85,0.85,0.88}
+
+\lstset{
+  language=Java,
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{javapurple}\bfseries,
+  stringstyle=\color{javared},
+  commentstyle=\color{javagreen}\itshape,
+  morecomment=[s][\color{javadocblue}]{/**}{*/},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=8pt,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{framegray},
+  tabsize=4,
+  captionpos=b
+}
+
+% --- Header and Footer Configuration ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\nouppercase{\leftmark}}
+\fancyhead[R]{\small Online Auction Management System}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% --- Section Numbering & Styling ---
+\titleformat{\section}{\Large\bfseries\color{blue!80!black}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{black!90}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{black!80}}{\thesubsubsection}{1em}{}
+
+\begin{document}
+
+% ==============================================================================
+% FRONT MATTER
+% ==============================================================================
+\begin{titlepage}
+    \centering
+    \vspace*{0.5cm}
+    
+    {\Huge \bfseries ONLINE AUCTION MANAGEMENT SYSTEM\par}
+    \vspace{0.4cm}
+    {\Large \textsc{BidNexus --- An Object-Oriented Desktop Auction Platform}\par}
+    
+    \vspace{1.2cm}
+    \rule{0.8\textwidth}{1.5pt}\par
+    \vspace{0.8cm}
+    
+    {\large \textbf{A Comprehensive Software Project Report Submitted in Partial Fulfillment of the Requirements for the Course:}\par}
+    \vspace{0.3cm}
+    {\Large \textbf{OBJECT-ORIENTED METHODOLOGIES (OOM)}\par}
+    
+    \vspace{1.2cm}
+    
+    \begin{minipage}{0.48\textwidth}
+        \begin{flushleft} \large
+            \textbf{Submitted By:}\\[0.2cm]
+            \textbf{Student 1:} [Student Name 1] \\
+            \textit{Roll No.:} [Roll Number 1]\\[0.15cm]
+            \textbf{Student 2:} [Student Name 2] \\
+            \textit{Roll No.:} [Roll Number 2]\\[0.15cm]
+            \textbf{Student 3:} [Student Name 3] \\
+            \textit{Roll No.:} [Roll Number 3]
+        \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.48\textwidth}
+        \begin{flushright} \large
+            \textbf{Under the Guidance of:}\\[0.2cm]
+            \textbf{[Faculty Guide Name]}\\
+            \textit{Designation:}\ [Assistant/Associate Professor]\\
+            Department of Computer Science and Engineering
+        \end{flushright}
+    \end{minipage}
+    
+    \vfill
+    
+    \includegraphics[width=0.22\textwidth]{figures/class_diagram.png}\\[0.3cm]
+    {\small \textit{(Departmental Emblem / Project Illustration)}}\\[0.4cm]
+    
+    {\large \textbf{Department of Computer Science and Engineering}\par}
+    {\large \textbf{[Institution / University Name]}\par}
+    {\normalsize [City, State, Pin Code]}\par
+    \vspace{0.4cm}
+    {\large Academic Year: 2026--2027\par}
+\end{titlepage}
+
+\newpage
+\pagenumbering{roman}
+\setcounter{page}{2}
+
+% --- Certificate ---
+\section*{Certificate of Originality and Completion}
+\addcontentsline{toc}{section}{Certificate of Originality and Completion}
+\vspace{1cm}
+
+This is to certify that the project entitled \textbf{``Online Auction Management System (BidNexus)''} is a bona fide record of academic project work carried out by:
+\begin{center}
+\begin{tabular}{llr}
+\toprule
+\textbf{Student Name} & \textbf{Roll Number} & \textbf{Branch / Semester} \\
+\midrule
+[Student Name 1] & [Roll Number 1] & B.Tech / B.E. CSE -- Sem VI \\
+[Student Name 2] & [Roll Number 2] & B.Tech / B.E. CSE -- Sem VI \\
+[Student Name 3] & [Roll Number 3] & B.Tech / B.E. CSE -- Sem VI \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent in partial fulfillment of the academic requirements for the course \textbf{Object-Oriented Methodologies (OOM)} of the Bachelor of Technology / Engineering in Computer Science and Engineering during the academic session 2026--2027.
+
+The work reported herein represents genuine system analysis, object-oriented design, architectural modeling, and software implementation executed under institutional supervision. It has not been submitted previously to any other institution for the award of any degree or diploma.
+
+\vspace{3cm}
+
+\noindent
+\begin{minipage}[t]{0.32\textwidth}
+\centering
+\textbf{[Faculty Guide Name]}\\
+\textit{Project Guide}\\
+Dept. of CSE
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.32\textwidth}
+\centering
+\textbf{[Head of Department]}\\
+\textit{Head of Department}\\
+Dept. of CSE
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.32\textwidth}
+\centering
+\textbf{[External Examiner]}\\
+\textit{External Examiner}\\
+Institutional Seal
+\end{minipage}
+
+\newpage
+
+% --- Declaration ---
+\section*{Declaration by Authors}
+\addcontentsline{toc}{section}{Declaration by Authors}
+\vspace{1cm}
+
+We hereby declare that the software project entitled \textbf{``Online Auction Management System (BidNexus)''} and this accompanying project report were independently researched, designed, coded, and verified by our project team under the esteemed guidance of \textbf{[Faculty Guide Name]}, Department of Computer Science and Engineering.
+
+We confirm that:
+\begin{enumerate}[label=(\alph*)]
+    \item The object-oriented design models, UML diagrams, layered architectural implementations, and Java source code are authentic and developed specifically for this project.
+    \item The underlying relational schema, transactional integrity controls, and concurrency mechanisms were designed and verified against the SQLite relational engine.
+    \item All external ideas, published literature, reference frameworks, and toolkits (such as PlantUML, JUnit 5, and SQLite JDBC) have been duly recognized and cited in the bibliography.
+    \item No portion of this project report has been plagiarized or submitted elsewhere for any academic credit or qualification.
+\end{enumerate}
+
+\vspace{2.5cm}
+
+\noindent
+\begin{minipage}[t]{0.32\textwidth}
+\centering
+\rule{4cm}{0.4pt}\\
+\textbf{[Student Name 1]}\\
+Roll No.: [Roll Number 1]
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.32\textwidth}
+\centering
+\rule{4cm}{0.4pt}\\
+\textbf{[Student Name 2]}\\
+Roll No.: [Roll Number 2]
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.32\textwidth}
+\centering
+\rule{4cm}{0.4pt}\\
+\textbf{[Student Name 3]}\\
+Roll No.: [Roll Number 3]
+\end{minipage}
+
+\vspace{1.5cm}
+\noindent \textbf{Date:} November 18, 2026\\
+\textbf{Place:} [City / Campus Name]
+
+\newpage
+
+% --- Acknowledgement ---
+\section*{Acknowledgements}
+\addcontentsline{toc}{section}{Acknowledgements}
+\vspace{0.8cm}
+
+We express our deepest sense of gratitude and respect to our revered project supervisor, \textbf{[Faculty Guide Name]}, for invaluable intellectual direction, rigorous reviews of our object-oriented designs, and constant encouragement throughout the development of the \textbf{Online Auction Management System (BidNexus)}.
+
+We extend our sincere thanks to \textbf{[Head of Department]}, Head of the Department of Computer Science and Engineering, for providing excellent laboratory computing infrastructure and fostering an academic environment that champions software engineering rigor.
+
+We are profoundly indebted to the faculty members and technical staff of the Department of Computer Science and Engineering for their direct and indirect support during our coursework in Object-Oriented Methodologies, Software Architecture, and Database Systems.
+
+Finally, we express our heartfelt appreciation to our parents and friends whose unwavering encouragement and patience made the successful culmination of this software engineering endeavor possible.
+
+\vspace{1.5cm}
+\begin{flushright}
+\textbf{Project Team}\\[0.1cm]
+[Student Name 1] \quad [Student Name 2] \quad [Student Name 3]
+\end{flushright}
+
+\newpage
+
+% --- Abstract ---
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+\vspace{0.8cm}
+
+The \textbf{Online Auction Management System (OAMS / BidNexus)} is an academic, production-grade desktop application engineered to demonstrate the practical application of \textbf{Object-Oriented Methodologies (OOM)}, software architecture patterns, and relational database integrity in real-time commerce. Traditional physical auctions and rudimentary electronic bidding systems frequently suffer from lack of transparency, architectural coupling, vulnerability to race conditions, and inadequate role-based access governance.
+
+This project delivers a modular, layered desktop solution developed in modern \textbf{Java (JDK 17+)} using the \textbf{Java Swing GUI} toolkit and backed by an embedded \textbf{SQLite} database via JDBC. The system explicitly grounds its domain model upon the \textbf{Four Pillars of Object-Oriented Programming}:
+\begin{itemize}[noitemsep]
+    \item \textbf{Encapsulation:} Enforced via immutable domain entities (\texttt{User}, \texttt{Auction}, \texttt{Bid}) with private final fields, comprehensive constructor validation, and read-only exposure.
+    \item \textbf{Inheritance:} Structured through an extensible hierarchical model where an abstract \texttt{User} base class is specialized into \texttt{Buyer}, \texttt{Seller}, and \texttt{Admin} subtypes.
+    \item \textbf{Abstraction:} Implemented through decoupled service interfaces and abstract role contracts (\texttt{getRole()}), insulating GUI presentation from data persistence.
+    \item \textbf{Polymorphism:} Realized through dynamic runtime dispatch, subtype substitution, and pattern matching switch expressions in role-tailored dashboard provisioning.
+\end{itemize}
+
+The system features robust business rule automation, including transactional bid placement with row-level locking to eliminate concurrent bid corruption, deterministic lazy auction expiration resolving listings into \texttt{SOLD} or \texttt{UNSOLD} states upon client access, and an integrated administrative monitoring console providing multi-field user search, auction status filtering, and policy-compliant auction cancellations. Complete automated test suites comprising 46 unit and integration test cases verify 100\% passing behavior across all domain constraints. This report provides an exhaustive technical analysis of system requirements, object-oriented analysis and design, UML specifications across eight standard modeling diagrams, architectural decisions, database schemas, and verification results.
+
+\bigskip
+\noindent \textbf{Keywords:} Object-Oriented Methodologies (OOM), Software Architecture, Encapsulation, Polymorphism, Unified Modeling Language (UML), Java Swing, SQLite JDBC, ACID Transactions, Auction Systems.
+
+\newpage
+
+% --- Table of Contents, Figures, Tables ---
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% ==============================================================================
+% REPORT CHAPTERS
+% ==============================================================================
+\input{chapters/01_introduction.tex}
+\newpage
+\input{chapters/02_oop_methodology.tex}
+\newpage
+\input{chapters/03_requirements.tex}
+\newpage
+\input{chapters/04_uml_design.tex}
+\newpage
+\input{chapters/05_architecture.tex}
+\newpage
+\input{chapters/06_technology_stack.tex}
+\newpage
+\input{chapters/07_implementation.tex}
+\newpage
+\input{chapters/08_database_design.tex}
+\newpage
+\input{chapters/09_testing.tex}
+\newpage
+\input{chapters/10_screenshots.tex}
+\newpage
+\input{chapters/11_conclusion.tex}
+
+% ==============================================================================
+% BIBLIOGRAPHY
+% ==============================================================================
+\newpage
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

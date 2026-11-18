@@ -1,0 +1,38 @@
+@startuml
+autonumber
+skinparam shadowing false
+skinparam roundcorner 5
+
+actor Seller
+boundary SellerPanel
+control AuctionService
+participant AuctionDAO
+database "SQLite Database (oams.db)" as DB
+
+Seller -> SellerPanel: Click "Create Auction" & enter details
+note right of Seller: Fields: Product Name, Category,\nStarting Price, Description, Duration
+SellerPanel -> SellerPanel: Validate GUI fields (non-empty, positive price, end time in future)
+SellerPanel -> AuctionService: createAuction(seller, newAuction)
+activate AuctionService
+
+AuctionService -> AuctionService: Validate invariants (seller.getRole() == SELLER, price > 0, endTime > now)
+
+alt Validation fails
+    AuctionService --> SellerPanel: throw IllegalArgumentException("Validation error")
+    SellerPanel --> Seller: Display validation error dialog
+else Invariants valid
+    AuctionService -> AuctionDAO: save(auction)
+    activate AuctionDAO
+    AuctionDAO -> DB: INSERT INTO auctions (seller_id, product_name, description,\ncategory, starting_price, end_time, status, created_at)\nVALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+    DB --> AuctionDAO: Generated auction ID
+    AuctionDAO --> AuctionService: Auction instance (with populated ID)
+    deactivate AuctionDAO
+
+    AuctionService --> SellerPanel: return created Auction
+    deactivate AuctionService
+
+    SellerPanel -> SellerPanel: loadAuctions() [Refresh seller listing]
+    SellerPanel --> Seller: Show "Auction created successfully" notification
+end
+
+@enduml

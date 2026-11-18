@@ -1,0 +1,80 @@
+\section{Introduction}
+\label{sec:introduction}
+
+\subsection{Project Background}
+Auctions represent one of the oldest and most economically efficient mechanisms for price discovery and resource allocation in human commerce. In a conventional English auction, potential buyers assemble physically, submitting sequentially ascending bids for an asset until no participant is willing to surpass the prevailing highest bid. While effective in localized, physical settings, traditional auction models suffer from severe geographical barriers, high operational overhead, limited buyer participation, and substantial administrative latency in clearing transactions.
+
+With the proliferation of modern computing infrastructure and networked software systems, digital auction platforms have fundamentally transformed commercial exchange. Platforms such as eBay demonstrated that automating auction mechanics enables global market liquidity, continuous trading, and transparent price formation. However, designing and implementing a dependable, real-time electronic auction system poses complex software engineering challenges. An online auction is inherently dynamic, stateful, and concurrent:
+\begin{itemize}[noitemsep]
+    \item Prices mutate rapidly under competitive bidding.
+    \item Multi-user interactions must remain strictly synchronized to prevent race conditions.
+    \item Temporal deadlines must be deterministically enforced to resolve listings into sold or unsold terminal states.
+    \item Distinct actors---Buyers, Sellers, and System Administrators---possess conflicting responsibilities and access privileges that require airtight authorization boundaries.
+\end{itemize}
+
+The \textbf{Online Auction Management System (OAMS)}, academically designated as \textbf{BidNexus}, has been designed and implemented to provide a rigorous, production-grade demonstration of \textbf{Object-Oriented Methodologies (OOM)}. By applying core object-oriented principles, formalized Unified Modeling Language (UML) designs, layered architectural patterns, and relational persistence via SQLite and JDBC, the project bridges theoretical software engineering concepts with practical software development.
+
+\subsection{Problem Statement}
+Elementary implementations of auction software frequently suffer from architectural anti-patterns that render systems brittle, insecure, and unmaintainable. Common deficiencies observed in naive systems include:
+\begin{enumerate}
+    \item \textbf{Tight Coupling and Code Duplication:} Business logic, user interface components, and raw SQL queries are entangled within single monolithic classes, preventing modular testing or evolution.
+    \item \textbf{Concurrency and Race Condition Vulnerabilities:} In concurrent multi-user environments, simultaneous bid submissions on the same auction item can lead to the ``lost update'' anomaly or permit a lower bid to overwrite a higher bid.
+    \item \textbf{Unenforced Invariants and Primitive Obsession:} Relying on mutable public fields or raw primitive types (e.g., using unbounded integers or floating-point primitives without domain validation) leads to invalid domain states, such as negative bid amounts, auctions ending in the past, or sellers bidding on their own listings.
+    \item \textbf{Ad-hoc Access Control and Security Vulnerabilities:} Passwords stored in plaintext or weak cryptographic hashes expose user accounts to compromise. A lack of role abstraction permits unauthorized users to execute administrative cancellations or perform privileged queries.
+    \item \textbf{Unreliable Expiration Mechanics:} Systems that rely purely on client clocks or fragile background timer threads often fail to transition expired auctions accurately when background threads terminate unexpectedly.
+\end{enumerate}
+
+To address these vulnerabilities, this project establishes a disciplined, object-oriented framework that guarantees domain consistency, architectural separation of concerns, cryptographic security, and transactional database integrity.
+
+\subsection{Project Objectives}
+The primary academic and technical objectives of the Online Auction Management System are:
+\begin{itemize}
+    \item \textbf{Rigorous OOP Modeling:} Implement domain abstractions that directly embody the four pillars of Object-Oriented Programming: Encapsulation, Inheritance, Abstraction, and Polymorphism.
+    \item \textbf{Layered Architectural Decoupling:} Maintain strict separation among Presentation (Java Swing GUI), Service/Business Logic, Security, and Data Access Objects (DAO).
+    \item \textbf{ACID-Compliant Concurrency Management:} Implement row-level locking and transaction rollbacks in SQLite to guarantee serializable bid updates and eliminate race conditions.
+    \item \textbf{Deterministic Lifecycle Automation:} Formulate a lazy-expiration mechanism that reliably evaluates auction termination criteria during user interactions without external scheduler dependencies.
+    \item \textbf{Role-Based Access Governance:} Enforce role differentiation across Guests, Buyers, Sellers, and Administrators, providing dynamic UI generation and backend policy verification.
+    \item \textbf{Complete Verification and Testability:} Validate all business rules, DAO operations, and service workflows through a 100\% passing automated JUnit 5 test suite.
+\end{itemize}
+
+\subsection{Scope of the Project}
+The project delivers a fully functional, self-contained desktop system. The scope encompasses:
+\begin{itemize}
+    \item \textbf{Identity and Authentication Subsystem:} User registration and login for Buyers and Sellers; PBKDF2 with HMAC-SHA256 salted password hashing; role validation; session management.
+    \item \textbf{Auction Management Subsystem:} Creation of auction listings with positive reserve prices, item categorization, and future expiration timestamps; multi-criteria search and retrieval.
+    \item \textbf{Bidding and Settlement Subsystem:} Real-time competitive bidding with strict increment validation; automatic rejection of self-bidding; automatic winner determination upon auction expiration.
+    \item \textbf{Administrative Subsystem:} System overview dashboard with real-time aggregated metrics; multi-attribute user search (ID, Name, Email, Role); comprehensive auction monitoring; policy-compliant listing cancellation.
+    \item \textbf{Persistence Layer:} Fully normalized SQLite schema enforcing foreign key referential integrity via explicit \texttt{PRAGMA foreign\_keys = ON}.
+\end{itemize}
+
+\paragraph{Limitations and Future Enhancements (Deliberate Out-of-Scope Elements):}
+In accordance with academic constraints, certain enterprise features are reserved for future work:
+\begin{itemize}[noitemsep]
+    \item Payment gateway integration (e.g., Stripe/PayPal) is represented as auction settlement status rather than active financial routing.
+    \item Multi-tier network remoting (e.g., REST/WebSockets) is replaced by local multi-threaded client execution on a shared SQLite engine.
+    \item Automated email/SMS dispatch upon winning an auction is tracked in-app via user dashboard history.
+\end{itemize}
+
+\subsection{Stakeholders and User Personas}
+The system serves four distinct user classes:
+\begin{enumerate}
+    \item \textbf{Visitor / Guest:} Unauthenticated prospective users seeking to explore available auctions or create an account.
+    \item \textbf{Buyer:} Authenticated users focused on querying active listings, evaluating pricing trends, placing bids, and tracking auction outcomes.
+    \item \textbf{Seller:} Authenticated merchants who list items, configure starting prices and durations, and inspect bidding interest.
+    \item \textbf{Administrator:} Trusted system overseers responsible for catalog health, user auditing, and moderating inappropriate or fraudulent listings.
+\end{enumerate}
+
+\subsection{Report Organization}
+The remainder of this report is structured as follows:
+\begin{itemize}[noitemsep]
+    \item \textbf{Chapter \ref{sec:oop_methodology}:} Explores the Object-Oriented Methodology and details the realization of the Four Pillars in Java.
+    \item \textbf{Chapter \ref{sec:requirements}:} Documents the Software Requirements Specification (SRS), functional/non-functional requirements, and use cases.
+    \item \textbf{Chapter \ref{sec:uml_design}:} Presents all eight UML diagrams, explaining their architectural significance.
+    \item \textbf{Chapter \ref{sec:architecture}:} Details the system architecture, design patterns, and package decomposition.
+    \item \textbf{Chapter \ref{sec:technology_stack}:} Outlines the tools, libraries, and frameworks utilized.
+    \item \textbf{Chapter \ref{sec:implementation}:} Walks through key implementation modules with real source code excerpts.
+    \item \textbf{Chapter \ref{sec:database_design}:} Explains the SQLite relational schema, integrity constraints, and query strategies.
+    \item \textbf{Chapter \ref{sec:testing}:} Reviews testing strategies, JUnit test cases, and verification metrics.
+    \item \textbf{Chapter \ref{sec:screenshots}:} Provides visual walkthroughs of the graphical user interfaces.
+    \item \textbf{Chapter \ref{sec:conclusion}:} Summarizes learnings, architectural contributions, and future scope.
+\end{itemize}

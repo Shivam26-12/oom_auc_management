@@ -1,0 +1,65 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam roundcorner 5
+
+package "Presentation / Swing GUI Layer (com.auction.ui)" {
+  [LoginFrame / RegisterFrame] as GUI_Auth
+  [DashboardFrame] as GUI_Dash
+  [BuyerPanel] as GUI_Buyer
+  [SellerPanel] as GUI_Seller
+  [AdminPanel] as GUI_Admin
+}
+
+package "Service / Business Logic Layer (com.auction.service)" {
+  [AuthService] as SVC_Auth
+  [AuctionService] as SVC_Auction
+  [BidService] as SVC_Bid
+  [AdminService] as SVC_Admin
+}
+
+package "Security Layer (com.auction.security)" {
+  [PasswordUtil] as SEC_Pass
+}
+
+package "Data Access Layer (com.auction.dao)" {
+  [UserDAO] as DAO_User
+  [AuctionDAO] as DAO_Auction
+  [BidDAO] as DAO_Bid
+  [DatabaseConnection] as DAO_Conn
+  [DatabaseInitializer] as DAO_Init
+}
+
+database "SQLite Database Engine\n(database/oams.db)" as DB
+
+GUI_Auth --> SVC_Auth
+GUI_Dash --> GUI_Buyer
+GUI_Dash --> GUI_Seller
+GUI_Dash --> GUI_Admin
+GUI_Buyer --> SVC_Auction
+GUI_Buyer --> SVC_Bid
+GUI_Seller --> SVC_Auction
+GUI_Seller --> SVC_Bid
+GUI_Admin --> SVC_Admin
+
+SVC_Auth --> SEC_Pass
+SVC_Auth --> DAO_User
+SVC_Auction --> DAO_Auction
+SVC_Auction --> DAO_Bid
+SVC_Auction --> DAO_Conn
+SVC_Bid --> DAO_Auction
+SVC_Bid --> DAO_Bid
+SVC_Bid --> DAO_User
+SVC_Bid --> DAO_Conn
+SVC_Admin --> DAO_User
+SVC_Admin --> DAO_Auction
+SVC_Admin --> DAO_Bid
+
+DAO_Init --> DAO_Conn
+DAO_User --> DAO_Conn
+DAO_Auction --> DAO_Conn
+DAO_Bid --> DAO_Conn
+
+DAO_Conn --> DB : SQLite JDBC Driver (PRAGMA foreign_keys = ON)
+
+@enduml

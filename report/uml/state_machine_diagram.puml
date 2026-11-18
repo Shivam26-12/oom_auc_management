@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam roundcorner 5
+
+[*] --> ACTIVE : Seller creates auction listing\n[status = ACTIVE, startingPrice > 0, endTime > now]
+
+state ACTIVE {
+  [*] --> AcceptingBids
+  AcceptingBids --> AcceptingBids : Buyer places valid higher bid\n[amount > currentHighestBid]
+}
+
+ACTIVE --> SOLD : Expiration detected AND hasValidBids == true\n[endTime <= now, highest bidder declared winner]
+
+ACTIVE --> UNSOLD : Expiration detected AND hasValidBids == false\n[endTime <= now, zero bids recorded]
+
+ACTIVE --> CANCELLED : Administrator executes moderation cancellation\n[admin.getRole() == ADMIN]
+
+SOLD --> [*] : Auction completed (terminal state)
+UNSOLD --> [*] : Auction closed without buyer (terminal state)
+CANCELLED --> [*] : Listing revoked by admin (terminal state)
+
+@enduml

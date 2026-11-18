@@ -1,6 +1,7 @@
-C:\Users\avdes\OneDrive\Apps\OOM PROJECT\src\test\java\com\auction\AdminServiceIntegrationTest.java
-C:\Users\avdes\OneDrive\Apps\OOM PROJECT\src\test\java\com\auction\AuctionServiceIntegrationTest.java
-C:\Users\avdes\OneDrive\Apps\OOM PROJECT\src\test\java\com\auction\BidServiceIntegrationTest.java
-C:\Users\avdes\OneDrive\Apps\OOM PROJECT\src\test\java\com\auction\dao\DatabaseIntegrationTest.java
-C:\Users\avdes\OneDrive\Apps\OOM PROJECT\src\test\java\com\auction\ui\RolePanelTest.java
-C:\Users\avdes\OneDrive\Apps\OOM PROJECT\src\test\java\com\auction\UserAuthenticationTest.java
+D:\desktop\BidNexus\src\test\java\com\auction\AdminServiceIntegrationTest.java
+D:\desktop\BidNexus\src\test\java\com\auction\AuctionServiceIntegrationTest.java
+D:\desktop\BidNexus\src\test\java\com\auction\BidServiceIntegrationTest.java
+D:\desktop\BidNexus\src\test\java\com\auction\dao\DatabaseIntegrationTest.java
+D:\desktop\BidNexus\src\test\java\com\auction\ui\AdminPanelVerificationTest.java
+D:\desktop\BidNexus\src\test\java\com\auction\ui\RolePanelTest.java
+D:\desktop\BidNexus\src\test\java\com\auction\UserAuthenticationTest.java

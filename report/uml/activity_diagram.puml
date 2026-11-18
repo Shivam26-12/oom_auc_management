@@ -1,0 +1,60 @@
+@startuml
+skinparam shadowing false
+skinparam roundcorner 5
+
+start
+:User Enters Login Credentials;
+:AuthService Authenticates with DB (PBKDF2 hash check);
+
+if (Credentials Valid?) then (yes)
+  :Initialize DashboardFrame;
+  :Polymorphic UI Dispatch by UserRole;
+  
+  if (User Role is Buyer?) then (yes)
+    :Load BuyerPanel;
+    :Browse Active Auctions (Auto-triggers lazy expiration check);
+    :Search or Select Auction Item;
+    :Input Bid Amount;
+    
+    if (Bid Amount > Highest Bid AND Bid Amount > Starting Price?) then (yes)
+      :Acquire Row-level Lock via Transaction;
+      :Save Bid Record in SQLite;
+      :Commit Transaction;
+      :Display Bid Confirmation;
+    else (no)
+      :Reject Bid with Descriptive Error Message;
+    endif
+    
+  elseif (User Role is Seller?) then (yes)
+    :Load SellerPanel;
+    :View Listed Auctions & Received Bids;
+    if (Action: Create Auction?) then (yes)
+      :Enter Product Info, Starting Price, End Time;
+      :Validate Input Invariants;
+      :Persist Auction with ACTIVE Status;
+      :Refresh Seller Listing;
+    endif
+    
+  else (User Role is Admin)
+    :Load AdminPanel;
+    :Query System Metrics (User counts, Auction breakdown);
+    :Render Statistics Overview Cards;
+    :Review Users Table or Auction Monitor Table;
+    if (Action: Moderate/Cancel Active Listing?) then (yes)
+      :Confirm Action via Dialog;
+      :Update Auction Status to CANCELLED in DB;
+      :Refresh Overview Statistics;
+    endif
+  endif
+  
+  :User Initiates Logout;
+  :Clear Session & Dispose Frames;
+  :Return to LoginFrame;
+  stop
+
+else (no)
+  :Display "Invalid Credentials" Error Dialog;
+  stop
+endif
+
+@enduml

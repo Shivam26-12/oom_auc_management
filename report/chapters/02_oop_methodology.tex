@@ -1,0 +1,211 @@
+\section{Object-Oriented Methodology and Design Philosophy}
+\label{sec:oop_methodology}
+
+\subsection{Core Philosophy: Modeling the Real-World Domain}
+Object-Oriented Methodologies (OOM) provide a paradigm for software engineering wherein systems are structured as cooperative collections of interacting, self-contained computational entities termed \textbf{objects}. Each object encapsulates both state (data attributes) and behavior (operations or methods) that directly correspond to real-world domain concepts. Rather than viewing software as a procedural sequence of instructions acting upon detached data structures, an object-oriented approach guarantees that data integrity, domain invariants, and operational policies are co-located within robust type abstractions \cite{bloch2018effective, gamma1994design}.
+
+In the Online Auction Management System (BidNexus), the problem domain is inherently object-centric. An auction consists of discrete actors (Buyers, Sellers, Administrators) trading specific items (Auctions) through competitive offers (Bids). Applying OOM ensures that the system remains modular, resilient against concurrent state corruption, straightforward to test, and naturally extensible.
+
+\subsection{The Four Pillars of Object-Oriented Programming}
+The foundational architecture of BidNexus rests squarely upon the four pillars of Object-Oriented Programming: \textbf{Encapsulation}, \textbf{Inheritance}, \textbf{Abstraction}, and \textbf{Polymorphism}. The following sections provide an in-depth analysis of how each pillar is operationalized within genuine Java source code.
+
+% --- Pillar 1: Encapsulation ---
+\subsubsection{Pillar 1: Encapsulation and Invariant Preservation}
+\textbf{Theoretical Definition:} Encapsulation is the mechanism that binds together data and the methods that manipulate that data, while shielding internal object representation from unauthorized external interference and misuse (information hiding). 
+
+\paragraph{Implementation in BidNexus:}
+In many vulnerable software systems, domain objects are treated as passive data holders (anemic domain models) with unrestricted public setters. This exposes internal state to inconsistent modifications (e.g., setting a negative bid or moving an auction end date into the past).
+
+BidNexus strictly enforces encapsulation across all domain entities---\texttt{User}, \texttt{Auction}, and \texttt{Bid}---by adopting the \textbf{Immutable Domain Entity} pattern:
+\begin{enumerate}
+    \item \textbf{Private Final Fields:} All instance variables are declared \texttt{private final}. Once an object is constructed, its reference state cannot be reassigned.
+    \item \textbf{Constructor-Level Invariant Enforcement:} Objects refuse construction unless all business invariants are validated at the constructor boundary.
+    \item \textbf{Absence of Public Mutators:} The classes expose no public setters. Mutation of business state (such as updating an auction status in the database) is handled via explicit transactional service methods rather than in-memory mutation.
+\end{enumerate}
+
+Listing \ref{lst:user_encapsulation} highlights encapsulation within the \texttt{User} class.
+
+\begin{lstlisting}[caption={Encapsulation and Invariant Checking in \texttt{User.java}}, label={lst:user_encapsulation}]
+public abstract class User {
+    private static final Pattern EMAIL_PATTERN = 
+        Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+
+    // Strictly encapsulated private final attributes
+    private final int id;
+    private final String name;
+    private final String email;
+    private final LocalDateTime createdAt;
+
+    protected User(int id, String name, String email, LocalDateTime createdAt) {
+        if (id < 0) {
+            throw new IllegalArgumentException("User id cannot be negative");
+        }
+        String normalizedName = Objects.requireNonNull(name, "name").trim();
+        if (normalizedName.isEmpty() || normalizedName.length() > 100) {
+            throw new IllegalArgumentException("Name must contain 1 to 100 characters");
+        }
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail.length() > 254 || !EMAIL_PATTERN.matcher(normalizedEmail).matches()) {
+            throw new IllegalArgumentException("A valid email address is required");
+        }
+
+        this.id = id;
+        this.name = normalizedName;
+        this.email = normalizedEmail;
+        this.createdAt = createdAt;
+    }
+
+    public static String normalizeEmail(String email) {
+        return Objects.requireNonNull(email, "email").trim().toLowerCase(Locale.ROOT);
+    }
+
+    // Read-only accessors shield internal state
+    public int getId() { return id; }
+    public String getName() { return name; }
+    public String getEmail() { return email; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public abstract UserRole getRole();
+}
+\end{lstlisting}
+
+Similarly, the \texttt{Auction} class encapsulates time-based lifecycle evaluation through its \texttt{isExpired()} method (Listing \ref{lst:auction_encapsulation}), eliminating the risk of external components calculating expiration inconsistently.
+
+\begin{lstlisting}[caption={Encapsulated Domain Logic in \texttt{Auction.java}}, label={lst:auction_encapsulation}]
+public final class Auction {
+    private final int id;
+    private final int sellerId;
+    private final String productName;
+    private final BigDecimal startingPrice;
+    private final LocalDateTime endTime;
+    private final AuctionStatus status;
+    // ... Additional fields omitted for brevity ...
+
+    public boolean isExpired() {
+        return isExpired(LocalDateTime.now());
+    }
+
+    public boolean isExpired(LocalDateTime now) {
+        return !Objects.requireNonNull(now, "now").isBefore(endTime);
+    }
+}
+\end{lstlisting}
+
+% --- Pillar 2: Inheritance ---
+\subsubsection{Pillar 2: Inheritance and Generalization Hierarchies}
+\textbf{Theoretical Definition:} Inheritance is the object-oriented mechanism by which a specialized derived class (subclass) inherits attributes and behaviors from a generalized base class (superclass), promoting code reuse and establishing an ``IS-A'' taxonomic relationship.
+
+\paragraph{Implementation in BidNexus:}
+In BidNexus, users of the platform share foundational identity attributes: each possesses a unique database identifier, a full name, a validated email address, and an account creation timestamp. However, each user acts in a distinct operational capacity.
+
+Rather than duplicating identity fields across separate disparate classes or employing a single monolithic user class littered with nullable role fields, BidNexus implements an inheritance hierarchy:
+\begin{itemize}
+    \item \texttt{User} acts as the abstract superclass providing common identity management and validation logic.
+    \item \texttt{Buyer}, \texttt{Seller}, and \texttt{Admin} extend \texttt{User} as concrete subclasses.
+\end{itemize}
+
+Listing \ref{lst:buyer_inheritance} demonstrates how \texttt{Buyer} extends \texttt{User}, invoking the base constructor via \texttt{super(...)} to reuse identity validation and establishing subclass specialization.
+
+\begin{lstlisting}[caption={Subclass Specialization via Inheritance in \texttt{Buyer.java}}, label={lst:buyer_inheritance}]
+public final class Buyer extends User {
+
+    public Buyer(String name, String email) {
+        this(0, name, email, LocalDateTime.now());
+    }
+
+    public Buyer(int id, String name, String email, LocalDateTime createdAt) {
+        super(id, name, email, createdAt); // Invokes base validation
+    }
+
+    @Override
+    public UserRole getRole() {
+        return UserRole.BUYER; // Subclass-specific specialization
+    }
+}
+\end{lstlisting}
+
+This taxonomy ensures that common user behavior is maintained in exactly one place (the superclass), adhering strictly to the Don't Repeat Yourself (DRY) principle.
+
+% --- Pillar 3: Abstraction ---
+\subsubsection{Pillar 3: Abstraction and Interface Contracts}
+\textbf{Theoretical Definition:} Abstraction is the intentional suppression of complex, irrelevant implementation details in favor of essential high-level behavioral contracts. It enables developers to interact with components via stable interfaces without concern for underlying mechanics.
+
+\paragraph{Implementation in BidNexus:}
+Abstraction operates at multiple architectural tiers within BidNexus:
+\begin{enumerate}
+    \item \textbf{Model-Level Behavioral Abstraction:} The \texttt{User} superclass declares the abstract method:
+    \begin{center}
+    \texttt{public abstract UserRole getRole();}
+    \end{center}
+    The base class does not define how a role is determined; instead, it establishes an abstract contract that all concrete user subtypes must fulfill.
+    \item \textbf{Layered Service Abstraction:} The Presentation Layer (Swing GUI) never communicates directly with SQL queries, SQLite JDBC drivers, or database connections. Instead, it interacts with high-level service abstractions:
+    \begin{itemize}
+        \item \texttt{AuthService}: Abstracts password hashing, salt generation, and credential verification into simple methods like \texttt{login(email, password)}.
+        \item \texttt{BidService}: Abstracts ACID transaction boundaries, row-level locks, and price comparison rules into a unified \texttt{placeBid(buyer, auctionId, amount)} call.
+        \item \texttt{AdminService}: Abstracts multi-table joins and aggregation queries into \texttt{getDashboardOverview()} and \texttt{cancelAuction(admin, auctionId)}.
+    \end{itemize}
+\end{enumerate}
+
+By hiding the complexities of database transaction handling and cryptographic algorithms behind clean service interfaces, the system achieves loose coupling and high maintainability.
+
+% --- Pillar 4: Polymorphism ---
+\subsubsection{Pillar 4: Polymorphism and Dynamic Method Dispatch}
+\textbf{Theoretical Definition:} Polymorphism (``many forms'') allows entities of different specific types to be handled through a common generic interface, with the specific execution behavior dynamically resolved at runtime (dynamic binding).
+
+\paragraph{Implementation in BidNexus:}
+Polymorphism is extensively utilized across BidNexus in both the domain layer and presentation workflows:
+\begin{enumerate}
+    \item \textbf{Subtype Polymorphism via Abstract Method Dispatch:} When the system retrieves a collection of registered users from the database, the Data Access Layer returns a polymorphic \texttt{List<User>}. Each element in the list is an instance of \texttt{Buyer}, \texttt{Seller}, or \texttt{Admin}. Invoking \texttt{user.getRole()} triggers dynamic method dispatch, executing the subclass-specific override at runtime without requiring brittle conditional type checks.
+    \item \textbf{Polymorphic UI Provisioning (Pattern Matching):} When a user successfully authenticates, the system launches \texttt{DashboardFrame(User user, ...)}. The dashboard dynamically provisions role-tailored workspaces based on the runtime type of the user, leveraging modern Java pattern matching and switch expressions as illustrated in Listing \ref{lst:dashboard_polymorphism}.
+\end{enumerate}
+
+\begin{lstlisting}[caption={Polymorphic Dashboard Page Dispatch in \texttt{DashboardFrame.java}}, label={lst:dashboard_polymorphism}]
+private JPanel createDashboardPage(String page) {
+    // Dynamic dispatch depending on the polymorphic role of the user
+    return switch (user.getRole()) {
+        case BUYER  -> createBuyerPage(page);
+        case SELLER -> createSellerPage(page);
+        case ADMIN  -> createAdminPage(page);
+    };
+}
+
+private JPanel createBuyerPage(String page) {
+    // Java 17 pattern matching for instanceof
+    if (user instanceof Buyer buyer) {
+        return switch (page) {
+            case "Overview"        -> new BuyerPanel(buyer, auctionService, bidService);
+            case "Browse auctions" -> new BuyerPanel(buyer, auctionService, bidService);
+            case "My bids"         -> buildBuyerTablePage("My Bids", ...);
+            case "Auction history" -> buildBuyerTablePage("Auction Results", ...);
+            default -> throw new IllegalArgumentException("Unknown page: " + page);
+        };
+    }
+    throw new IllegalStateException("BUYER role does not match account type");
+}
+\end{lstlisting}
+
+\subsection{Comparative Analysis: OOP Concepts vs. Project Implementation}
+Table \ref{tab:oop_comparison} synthesizes how theoretical OOP principles are concretely mapped into the BidNexus codebase, demonstrating alignment between academic theory and practical software construction.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Systematic Mapping of OOP Concepts to BidNexus Source Implementation}
+\label{tab:oop_comparison}
+\begin{tabularx}{\textwidth}{p{2.8cm}p{4cm}p{4.2cm}X}
+\toprule
+\textbf{OOP Concept} & \textbf{Theoretical Definition} & \textbf{BidNexus Implementation} & \textbf{Architectural Benefit} \\
+\midrule
+\textbf{Encapsulation} & Bundling state and methods; hiding internal representations. & \texttt{User}, \texttt{Auction}, \texttt{Bid} classes use \texttt{private final} fields and constructor validation. & Prevents illegal state; guarantees immutable domain models. \\
+\addlinespace
+\textbf{Inheritance} & Deriving specialized classes from a generalized base class. & \texttt{Buyer}, \texttt{Seller}, \texttt{Admin} extend \texttt{abstract class User}. & Eliminates redundant code; centralizes identity validation. \\
+\addlinespace
+\textbf{Abstraction} & Exposing essential behavior while concealing implementation details. & Abstract method \texttt{getRole()}; Service interfaces (\texttt{BidService}, \texttt{AuthService}). & Insulates GUI from raw SQL, transactions, and cryptography. \\
+\addlinespace
+\textbf{Polymorphism} & Treating diverse subtypes uniformly through common interfaces. & Runtime dispatch of \texttt{user.getRole()}; pattern matching in \texttt{DashboardFrame}. & Enables dynamic UI rendering and role-based policy enforcement. \\
+\addlinespace
+\textbf{Cohesion} & Degree to which elements inside a module belong together. & Layered separation: Model (state), DAO (persistence), Service (rules). & High cohesion ensures single-responsibility compliance. \\
+\addlinespace
+\textbf{Loose Coupling} & Minimizing interdependencies between components. & Dependency injection of DAOs and connections into service layers. & Facilitates isolated unit testing using in-memory databases. \\
+\bottomrule
+\end{tabularx}
+\end{table}

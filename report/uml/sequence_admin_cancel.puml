@@ -1,0 +1,58 @@
+@startuml
+autonumber
+skinparam shadowing false
+skinparam roundcorner 5
+
+actor Admin as "System Administrator"
+boundary AdminPanel
+control AdminService
+participant AuctionDAO
+database "SQLite Database (oams.db)" as DB
+
+Admin -> AdminPanel: Select auction row & click "Cancel Auction"
+activate AdminPanel
+
+AdminPanel -> AdminPanel: Prompt confirmation dialog: "Are you sure?"
+alt Admin cancels confirmation
+    AdminPanel --> Admin: Abort cancellation
+else Admin confirms
+    AdminPanel -> AdminService: cancelAuction(admin, selectedAuctionId)
+    activate AdminService
+
+    AdminService -> AdminService: Verify admin authorization (admin.getRole() == ADMIN)
+    alt Unauthorized user role
+        AdminService --> AdminPanel: throw SecurityException("Admin authorization required")
+    else Authorized Admin
+        AdminService -> AuctionDAO: findById(auctionId)
+        activate AuctionDAO
+        AuctionDAO -> DB: SELECT * FROM auctions WHERE id = ?
+        DB --> AuctionDAO: Auction record
+        AuctionDAO --> AdminService: Optional<Auction>
+        deactivate AuctionDAO
+
+        alt Auction not found
+            AdminService --> AdminPanel: throw IllegalArgumentException("Auction not found")
+        else Auction found
+            AdminService -> AdminService: Check auction.getStatus() == ACTIVE
+            alt Status != ACTIVE (already SOLD, UNSOLD, or CANCELLED)
+                AdminService --> AdminPanel: throw IllegalStateException("Only ACTIVE auctions can be cancelled")
+            else Status == ACTIVE
+                AdminService -> AuctionDAO: updateStatus(auctionId, CANCELLED)
+                activate AuctionDAO
+                AuctionDAO -> DB: UPDATE auctions SET status = 'CANCELLED' WHERE id = ?
+                DB --> AuctionDAO: 1 row affected
+                AuctionDAO --> AdminService: void
+                deactivate AuctionDAO
+
+                AdminService --> AdminPanel: void (Success)
+                deactivate AdminService
+
+                AdminPanel -> AdminPanel: Refresh auctions table & dashboard statistic cards
+                AdminPanel --> Admin: Display "Auction successfully cancelled" message
+            end
+        end
+    end
+end
+deactivate AdminPanel
+
+@enduml

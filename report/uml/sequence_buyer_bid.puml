@@ -1,0 +1,83 @@
+@startuml
+autonumber
+skinparam shadowing false
+skinparam roundcorner 5
+
+actor Buyer
+boundary BuyerPanel
+control BidService
+participant DatabaseConnection
+participant UserDAO
+participant AuctionDAO
+participant BidDAO
+database "SQLite Database (oams.db)" as DB
+
+Buyer -> BuyerPanel: Enter bid amount & submit
+BuyerPanel -> BidService: placeBid(buyer, auctionId, amount)
+activate BidService
+
+BidService -> DatabaseConnection: openConnection()
+DatabaseConnection --> BidService: Connection (conn)
+BidService -> conn: setAutoCommit(false) [Begin Transaction]
+
+BidService -> AuctionDAO: lockAuctionForUpdate(conn, auctionId)
+AuctionDAO -> DB: UPDATE auctions SET status = status WHERE id = ?
+DB --> AuctionDAO: row locked
+
+BidService -> UserDAO: findById(conn, buyerId)
+UserDAO -> DB: SELECT * FROM users WHERE id = ?
+DB --> UserDAO: User record
+UserDAO --> BidService: Buyer instance
+
+alt Buyer record invalid or not BUYER role
+    BidService -> conn: rollback()
+    BidService --> BuyerPanel: throw IllegalArgumentException("Invalid Buyer")
+else Valid Buyer
+    BidService -> AuctionDAO: findById(conn, auctionId)
+    AuctionDAO -> DB: SELECT * FROM auctions WHERE id = ?
+    DB --> AuctionDAO: Auction record
+    AuctionDAO --> BidService: Auction instance
+
+    alt Auction not found or Seller is Buyer
+        BidService -> conn: rollback()
+        BidService --> BuyerPanel: throw IllegalStateException("Cannot bid on own auction")
+    else Valid Auction
+        alt Auction is expired (endTime <= now)
+            BidService -> BidDAO: findHighestBid(conn, auctionId)
+            BidDAO -> DB: SELECT * FROM bids WHERE auction_id = ? ORDER BY amount DESC LIMIT 1
+            DB --> BidDAO: Highest Bid or null
+            BidDAO --> BidService: Optional<Bid>
+            
+            alt Bid exists
+                BidService -> AuctionDAO: updateStatus(conn, auctionId, SOLD)
+                AuctionDAO -> DB: UPDATE auctions SET status = 'SOLD'
+            else No bids
+                BidService -> AuctionDAO: updateStatus(conn, auctionId, UNSOLD)
+                AuctionDAO -> DB: UPDATE auctions SET status = 'UNSOLD'
+            end
+            BidService -> conn: commit()
+            BidService --> BuyerPanel: throw IllegalStateException("Auction expired and closed")
+        else Auction ACTIVE & Unexpired
+            BidService -> BidDAO: findHighestBid(conn, auctionId)
+            BidDAO -> DB: SELECT * FROM bids WHERE auction_id = ? ORDER BY amount DESC LIMIT 1
+            DB --> BidDAO: Current highest bid
+            BidDAO --> BidService: Optional<Bid>
+
+            alt Amount <= current highest bid OR Amount <= starting price
+                BidService -> conn: rollback()
+                BidService --> BuyerPanel: throw IllegalArgumentException("Bid must exceed current highest bid")
+            else Valid competitive amount
+                BidService -> BidDAO: saveBid(conn, newBid)
+                BidDAO -> DB: INSERT INTO bids (auction_id, buyer_id, amount, bid_time) VALUES (...)
+                DB --> BidDAO: Generated bid ID
+                BidDAO --> BidService: Saved Bid instance
+                BidService -> conn: commit()
+                BidService --> BuyerPanel: return saved Bid
+            end
+        end
+    end
+end
+
+BuyerPanel --> Buyer: Show Success Dialog / Error Message
+deactivate BidService
+@enduml

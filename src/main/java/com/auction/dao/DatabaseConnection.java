@@ -13,7 +13,27 @@ public final class DatabaseConnection {
     private final Path databaseFile;
 
     public DatabaseConnection() {
-        this(Path.of("database", "oams.db"));
+        this(resolveDefaultDatabasePath());
+    }
+
+    private static Path resolveDefaultDatabasePath() {
+        Path relative = Path.of("database", "oams.db");
+        if (Files.exists(relative)) {
+            return relative;
+        }
+        try {
+            Path codeSource = Path.of(DatabaseConnection.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI());
+            Path parent = codeSource.getParent();
+            if (parent != null && parent.getParent() != null) {
+                Path candidate = parent.getParent().resolve("database").resolve("oams.db");
+                if (Files.exists(candidate)) {
+                    return candidate;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return relative;
     }
 
     public DatabaseConnection(Path databaseFile) {

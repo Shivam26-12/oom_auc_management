@@ -9,6 +9,7 @@ import com.auction.model.Auction;
 import com.auction.model.AuctionStatus;
 import com.auction.model.Buyer;
 import com.auction.model.Seller;
+import com.auction.model.User;
 import com.auction.service.AdminService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,5 +95,41 @@ class AdminServiceIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> adminService.cancelAuction(999, buyer));
         assertThrows(IllegalArgumentException.class, () -> adminService.cancelAuction(0, buyer));
         assertFalse(active.getStatus() == AuctionStatus.CANCELLED);
+    }
+
+    @Test
+    void adminCanSearchUsersWithRoleFilterAndId() throws SQLException {
+        // Search by role filter
+        List<User> buyers = adminService.searchUsers("", "BUYER");
+        assertEquals(1, buyers.size());
+        assertEquals(buyer.getId(), buyers.get(0).getId());
+
+        List<User> sellers = adminService.searchUsers("", "SELLER");
+        assertEquals(1, sellers.size());
+        assertEquals(seller.getId(), sellers.get(0).getId());
+
+        // Search by user ID
+        List<User> byId = adminService.searchUsers(String.valueOf(admin.getId()), "ALL");
+        assertEquals(1, byId.size());
+        assertEquals("admin@example.test", byId.get(0).getEmail());
+    }
+
+    @Test
+    void adminCanGetEnrichedAuctionsAndDetails() throws SQLException {
+        Auction auction = auctionDAO.save(new Auction(0, seller.getId(), "Smartphone", "64GB", "Electronics",
+                BigDecimal.valueOf(100), LocalDateTime.now().plusDays(3), AuctionStatus.ACTIVE, LocalDateTime.now()));
+
+        var enriched = adminService.getEnrichedAuctions("Smartphone", "ACTIVE");
+        assertEquals(1, enriched.size());
+        assertEquals("Seller One", enriched.get(0).sellerName());
+        assertEquals(BigDecimal.valueOf(100.0), enriched.get(0).currentHighestBid());
+
+        var fullDetails = adminService.getAuctionFullDetails(auction.getId());
+        assertEquals("Smartphone", fullDetails.auction().getProductName());
+        assertEquals("Seller One", fullDetails.seller().getName());
+        assertEquals(0, fullDetails.bids().size());
+
+        var userSummary = adminService.getUserSummary(seller.getId());
+        assertEquals(1, userSummary.auctionCount());
     }
 }

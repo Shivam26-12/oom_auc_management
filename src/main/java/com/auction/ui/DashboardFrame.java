@@ -250,9 +250,9 @@ public final class DashboardFrame extends JFrame {
     private JPanel createAdminPage(String page) {
         if (user instanceof Admin admin) {
             return switch (page) {
-                case "Users" -> new AdminPanel(admin, adminService, auctionService);
-                case "Auction monitoring" -> new AdminPanel(admin, adminService, auctionService);
-                case "Moderation" -> new AdminPanel(admin, adminService, auctionService);
+                case "Users" -> new AdminPanel(admin, adminService, auctionService, "Users");
+                case "Auction monitoring" -> new AdminPanel(admin, adminService, auctionService, "Auctions");
+                case "Moderation" -> new AdminPanel(admin, adminService, auctionService, "Moderation");
                 default -> throw new IllegalArgumentException("Unknown Admin dashboard page: " + page);
             };
         }
@@ -271,6 +271,14 @@ public final class DashboardFrame extends JFrame {
         JPanel view = new JPanel(new BorderLayout(0, 16));
         view.setBackground(UiStyle.BACKGROUND);
         view.add(UiStyle.title(title), BorderLayout.NORTH);
+
+        // Toolbar with Refresh button
+        JPanel toolbar = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0));
+        toolbar.setOpaque(false);
+        JButton refreshButton = UiStyle.secondaryButton("Refresh");
+        toolbar.add(refreshButton);
+        view.add(toolbar, BorderLayout.SOUTH);
+
         JTable table = new JTable(new javax.swing.table.DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -285,27 +293,36 @@ public final class DashboardFrame extends JFrame {
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createLineBorder(UiStyle.BORDER));
         view.add(scroll, BorderLayout.CENTER);
-        new javax.swing.SwingWorker<java.util.List<Object[]>, Void>() {
-            @Override
-            protected java.util.List<Object[]> doInBackground() throws Exception {
-                return loader.call();
-            }
 
-            @Override
-            protected void done() {
-                try {
-                    java.util.List<Object[]> rows = get();
-                    javax.swing.table.DefaultTableModel model = (javax.swing.table.DefaultTableModel) table.getModel();
-                    model.setRowCount(0);
-                    for (Object[] row : rows) {
-                        model.addRow(row);
-                    }
-                } catch (Exception exception) {
-                    javax.swing.JOptionPane.showMessageDialog(DashboardFrame.this,
-                            "Unable to load this buyer data.", "Buyer dashboard", javax.swing.JOptionPane.ERROR_MESSAGE);
+        // Shared loader runnable used by both initial load and Refresh
+        Runnable loadData = () -> {
+            refreshButton.setEnabled(false);
+            new javax.swing.SwingWorker<java.util.List<Object[]>, Void>() {
+                @Override
+                protected java.util.List<Object[]> doInBackground() throws Exception {
+                    return loader.call();
                 }
-            }
-        }.execute();
+
+                @Override
+                protected void done() {
+                    refreshButton.setEnabled(true);
+                    try {
+                        java.util.List<Object[]> rows = get();
+                        javax.swing.table.DefaultTableModel model = (javax.swing.table.DefaultTableModel) table.getModel();
+                        model.setRowCount(0);
+                        for (Object[] row : rows) {
+                            model.addRow(row);
+                        }
+                    } catch (Exception exception) {
+                        javax.swing.JOptionPane.showMessageDialog(DashboardFrame.this,
+                                "Unable to load this buyer data.", "Buyer dashboard", javax.swing.JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }.execute();
+        };
+
+        refreshButton.addActionListener(event -> loadData.run());
+        loadData.run(); // initial load
         return view;
     }
 
@@ -334,9 +351,9 @@ public final class DashboardFrame extends JFrame {
                 default -> throw new IllegalArgumentException("Unknown Seller dashboard page: " + page);
             };
             case ADMIN -> switch (page) {
-                case "Users" -> "User administration will be available in Phase 7.";
-                case "Auction monitoring" -> "Auction status monitoring will be available in Phase 7.";
-                case "Moderation" -> "Listing moderation will be available in Phase 7.";
+                case "Users" -> "Manage registered buyers and sellers.";
+                case "Auction monitoring" -> "Monitor active, sold, unsold, and cancelled auctions.";
+                case "Moderation" -> "Manage auctions and review closed listings.";
                 default -> throw new IllegalArgumentException("Unknown Admin dashboard page: " + page);
             };
         };

@@ -1,0 +1,41 @@
+@startuml
+skinparam roundcorner 5
+skinparam shadowing false
+
+entity "users" as users {
+  * id : INTEGER <<PK, AUTOINCREMENT>>
+  --
+  * name : TEXT
+  * email : TEXT <<UNIQUE>>
+  * password_hash : TEXT
+  * role : TEXT <<CHECK: BUYER, SELLER, ADMIN>>
+  created_at : TEXT <<ISO-8601>>
+}
+
+entity "auctions" as auctions {
+  * id : INTEGER <<PK, AUTOINCREMENT>>
+  --
+  * seller_id : INTEGER <<FK -> users(id)>>
+  * product_name : TEXT
+  description : TEXT
+  category : TEXT
+  * starting_price : REAL <<CHECK: > 0>>
+  * end_time : TEXT <<ISO-8601>>
+  * status : TEXT <<CHECK: ACTIVE, SOLD, UNSOLD, CANCELLED>>
+  created_at : TEXT <<ISO-8601>>
+}
+
+entity "bids" as bids {
+  * id : INTEGER <<PK, AUTOINCREMENT>>
+  --
+  * auction_id : INTEGER <<FK -> auctions(id)>>
+  * buyer_id : INTEGER <<FK -> users(id)>>
+  * amount : REAL <<CHECK: > 0>>
+  * bid_time : TEXT <<ISO-8601>>
+}
+
+users ||--o{ auctions : "Seller creates (1:N)"
+auctions ||--o{ bids : "Auction receives (1:N)"
+users ||--o{ bids : "Buyer places (1:N)"
+
+@enduml

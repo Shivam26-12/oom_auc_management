@@ -1,0 +1,56 @@
+@startuml
+autonumber
+skinparam shadowing false
+skinparam roundcorner 5
+
+actor "Client Action\n(Browse / Bid / Refresh)" as Trigger
+participant AuctionService
+participant DatabaseConnection
+participant AuctionDAO
+participant BidDAO
+database "SQLite Database (oams.db)" as DB
+
+Trigger -> AuctionService: refreshExpiredAuctions() / getActiveAuctions()
+activate AuctionService
+
+AuctionService -> DatabaseConnection: openConnection()
+DatabaseConnection --> AuctionService: Connection (conn)
+AuctionService -> conn: setAutoCommit(false) [Begin Batch Transaction]
+
+AuctionService -> AuctionDAO: findExpiredActiveAuctions(conn, LocalDateTime.now())
+activate AuctionDAO
+AuctionDAO -> DB: SELECT * FROM auctions WHERE status = 'ACTIVE' AND end_time <= ?
+DB --> AuctionDAO: List<Auction> expiredList
+AuctionDAO --> AuctionService: List<Auction>
+deactivate AuctionDAO
+
+loop for each expiredAuction in expiredList
+    AuctionService -> BidDAO: findHighestBid(conn, expiredAuction.getId())
+    activate BidDAO
+    BidDAO -> DB: SELECT * FROM bids WHERE auction_id = ? ORDER BY amount DESC LIMIT 1
+    DB --> BidDAO: Highest Bid row (or null)
+    BidDAO --> AuctionService: Optional<Bid>
+    deactivate BidDAO
+
+    alt Bid present (Auction has at least one valid bid)
+        AuctionService -> AuctionDAO: updateStatus(conn, expiredAuction.getId(), SOLD)
+        activate AuctionDAO
+        AuctionDAO -> DB: UPDATE auctions SET status = 'SOLD' WHERE id = ?
+        AuctionDAO --> AuctionService: success
+        deactivate AuctionDAO
+        note right of AuctionService: Winner is buyer associated with highest bid
+    else No bids placed
+        AuctionService -> AuctionDAO: updateStatus(conn, expiredAuction.getId(), UNSOLD)
+        activate AuctionDAO
+        AuctionDAO -> DB: UPDATE auctions SET status = 'UNSOLD' WHERE id = ?
+        AuctionDAO --> AuctionService: success
+        deactivate AuctionDAO
+    end
+end
+
+AuctionService -> conn: commit()
+AuctionService -> conn: close()
+AuctionService --> Trigger: updated auction catalog
+deactivate AuctionService
+
+@enduml
